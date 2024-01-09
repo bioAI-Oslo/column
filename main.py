@@ -12,7 +12,13 @@ from localconfig import config
 # the error logs files.
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from src.logger import Logger
-from src.loss import highest_value, highest_vote, pixel_wise_L2, scale_loss
+from src.loss import (
+    highest_value,
+    highest_vote,
+    pixel_wise_CE,
+    pixel_wise_L2,
+    scale_loss,
+)
 from src.mnist_processing import get_MNIST_data
 from src.moving_nca import MovingNCA
 from src.utils import get_weights_info
@@ -41,7 +47,7 @@ parser.add_argument(
 )
 parser.add_argument("-v", "--visualize", action="store_true", help="Visualize mode")
 parser.add_argument("-s", "--save", action="store_true", help="Save data")
-parser.add_argument("-t", "--test_path", type=str, help="If not specified, defaults to training", default=None)
+parser.add_argument("-tp", "--test_path", type=str, help="If not specified, defaults to training", default=None)
 parser.add_argument("-vn", "--vis_num", type=int, help="Number of inferences to visualize", default=1)
 
 args = parser.parse_args()
@@ -164,7 +170,7 @@ def run_optimize():
 
     pool = None
     if config.training.threads > 1:
-        print("We're starting pools")
+        print("We're starting pools with", config.training.threads, "threads")
         mp.set_start_method("spawn")
         pool = mp.Pool(config.training.threads)  # , maxtasksperchild=10)
 
