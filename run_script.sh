@@ -3,7 +3,7 @@
 #SBATCH -p milanq #armq #milanq #fpgaq #milanq # partition (queue)
 #SBATCH -N 1 # number of nodes
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=80
+#SBATCH --cpus-per-task=30
 ##SBATCH --mem-per-cpu=1GB
 #SBATCH --time=2-00:00
 #SBATCH -o /home/mkkvalsu/slurm.column.%j.%N.out # STDOUT
@@ -15,4 +15,4 @@ module load slurm/slurm/21.08.8
 
 . /home/mkkvalsu/python_envs/column_env/bin/activate
 
-srun python3 /home/mkkvalsu/projects/column/main.py 
+srun python3 /home/mkkvalsu/projects/column/main.py -s  

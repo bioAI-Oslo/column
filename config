@@ -1,7 +1,7 @@
 [TRAINING]
-maxgen = 1000
+maxgen = 3000
 popsize = 30
-threads = 4
+threads = 30
 pool_training = False 
 loss = pixel_wise_CE
 predicting_method = highest_vote
@@ -13,8 +13,8 @@ test_n_neo = 26
 test_m_neo = 26
 
 [LOGGING]
-saving_interval = 40
-plotting_interval = 20
+saving_interval = 50
+plotting_interval = 30
 visualize_interval = 70000
 
 [DATASET]
