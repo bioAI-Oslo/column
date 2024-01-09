@@ -1,10 +1,10 @@
 [TRAINING]
-maxgen = 3
+maxgen = 900
 popsize = 30
 threads = 4
 pool_training = False 
 loss = pixel_wise_L2
-predicting_method = highest_value
+predicting_method = highest_vote
 
 [SCALE]
 train_n_neo = 15
@@ -13,7 +13,7 @@ test_n_neo = 26
 test_m_neo = 26
 
 [LOGGING]
-saving_interval = 1
+saving_interval = 10
 plotting_interval = 1
 visualize_interval = 70000
 

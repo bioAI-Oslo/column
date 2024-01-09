@@ -12,7 +12,7 @@ from localconfig import config
 # the error logs files.
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from src.logger import Logger
-from src.loss import highest_value, pixel_wise_L2, scale_loss
+from src.loss import highest_value, highest_vote, pixel_wise_L2, scale_loss
 from src.mnist_processing import get_MNIST_data
 from src.moving_nca import MovingNCA
 from src.utils import get_weights_info
@@ -28,9 +28,10 @@ random.seed(0)
 tf.random.set_seed(0)
 
 parser = argparse.ArgumentParser(
-    prog="ProgramName", description="This program runs an optimization.", epilog="Text at the bottom of help"
+    prog="Main", description="This program runs an optimization.", epilog="Text at the bottom of help"
 )
 parser.add_argument("-c", "--config", type=str, help="The config file to use", default="config")
+parser.add_argument("-sf", "--sub_folder", type=str, help="The sub folder to use", default=None)
 parser.add_argument(
     "-cp",
     "--continue_path",
@@ -142,8 +143,8 @@ def run_optimize():
 
     # Init solution for the ES to initialize
     init_sol = None
-    if config.training.continue_run:
-        init_sol = Logger.load_checkpoint(config)
+    if args.continue_path is not None:
+        init_sol = Logger.load_checkpoint(args.continue_path)
     else:
         init_sol = int(weight_amount.numpy()) * [0.0]
     es = cma.CMAEvolutionStrategy(init_sol, 0.001)  # 0.001

@@ -27,6 +27,14 @@ def highest_value(class_images):
     return np.argmax(belief)
 
 
+def highest_vote(class_images):
+    votes = np.zeros(len(class_images))
+    for x in range(len(class_images)):
+        for y in range(len(class_images[0])):
+            votes[np.argmax(class_images[x, y])] += 1
+    return np.argmax(votes)
+
+
 def entropy_seeking_loss(perceptions, image):
     """entropy_img = global_entropy_image(image)
     entropy = 0
