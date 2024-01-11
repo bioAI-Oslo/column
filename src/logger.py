@@ -99,8 +99,8 @@ class Logger(LoggerBase):
 
         return best_solution
 
-    def save_checkpoint(self, solution):
-        with open(self.path + "/best_network", "w") as file:
+    def save_checkpoint(self, solution, filename):
+        with open(self.path + "/" + filename, "w") as file:
             file.write(json.dumps(list(solution)))
             file.close()
 

@@ -255,7 +255,9 @@ def run_optimize():
                     )
 
             if args.save and g % config.logging.saving_interval == 0:
-                logger_object.save_checkpoint(bestever_weights)
+                current_best_weights = solutions[np.argmin(solutions_fitness)]
+                logger_object.save_checkpoint(current_best_weights, filename="best_network")
+                logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
                 logger_object.save_plotting_data()
 
             end_time = time.time()
@@ -270,7 +272,9 @@ def run_optimize():
         pool.close()
 
     if args.save:
-        logger_object.save_checkpoint(bestever_weights)
+        current_best_weights = solutions[np.argmin(solutions_fitness)]
+        logger_object.save_checkpoint(current_best_weights, filename="best_network")
+        logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
         logger_object.save_plotting_data()
 
     return bestever_weights
