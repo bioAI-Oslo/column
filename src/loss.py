@@ -15,7 +15,7 @@ def pixel_wise_CE(img, guesses, expected):
     N, M, O = img.shape
     predicted = np.reshape(img, (N * M, O))
     expected = [expected for _ in range(len(predicted))]
-    return float(tf.keras.losses.CategoricalCrossentropy(from_logits=False)(expected, predicted))
+    return float(tf.keras.losses.CategoricalCrossentropy(from_logits=True)(expected, predicted))
 
 
 def final_guess_wise_L2(img, guesses, expected):
