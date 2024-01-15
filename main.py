@@ -13,6 +13,7 @@ from localconfig import config
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from src.logger import Logger
 from src.loss import (
+    global_mean_medians,
     highest_value,
     highest_vote,
     pixel_wise_CE,
