@@ -18,6 +18,22 @@ def pixel_wise_CE(img, guesses, expected):
     return float(tf.keras.losses.CategoricalCrossentropy(from_logits=True)(expected, predicted))
 
 
+def global_mean_medians(img, guesses, expected):
+    N, M, O = img.shape
+    length = N * M
+    interval_start = length // 2 - length // 6
+    interval_end = length // 2 + length // 6
+    mean_medians = []
+    for channel in range(O):
+        channel_values = img[:, :, channel].flatten()
+        channel_values = np.sort(channel_values)
+        interval = channel_values[interval_start:interval_end]
+        mean_medians.append(np.mean(interval))
+
+    print(np.mean(img, axis=(0, 1)))
+    return np.sum(((np.array(expected) - np.array(mean_medians)) ** 2))
+
+
 def final_guess_wise_L2(img, guesses, expected):
     N, M = img.shape[:2]
     loss = 0
@@ -121,7 +137,7 @@ if __name__ == "__main__":
 
     losses = []
     for _ in range(100):
-        loss = pixel_wise_CE(predicted, None, expected)
+        loss = global_mean_medians(predicted, None, expected)
         losses.append(loss)
         predicted[:, :, 0] -= predicted[:, :, 0] / 10
         predicted[:, :, 1] += (1 - predicted[:, :, 1]) / 10
