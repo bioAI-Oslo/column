@@ -30,7 +30,6 @@ def global_mean_medians(img, guesses, expected):
         interval = channel_values[interval_start:interval_end]
         mean_medians.append(np.mean(interval))
 
-    print(np.mean(img, axis=(0, 1)))
     return np.sum(((np.array(expected) - np.array(mean_medians)) ** 2))
 
 
