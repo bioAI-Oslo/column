@@ -32,26 +32,36 @@ with open(args.path + "/plotting_data", "r") as file:
     data = json.load(file)
 
 x = data["x_axis"]
-
+smoothing_factor = int(11 * (len(x) // 50))
+print(smoothing_factor)
+if smoothing_factor % 2 == 0:
+    smoothing_factor += 1
 
 plt.figure()
+# Plotting smoothed mean
+smooth_mean = smooth_line(smoothing_factor, data["mean_loss_history"])
+smooth_std = smooth_line(smoothing_factor, data["std_loss_history"])
 plt.fill_between(
     x,
-    np.array(data["mean_loss_history"]) - np.array(data["std_loss_history"]),
-    np.array(data["mean_loss_history"]) + np.array(data["std_loss_history"]),
-    color="#2365A355",
+    np.array(smooth_mean) - np.array(smooth_std),
+    np.array(smooth_mean) + np.array(smooth_std),
+    color="#005F6055",
 )
-plt.plot(x, data["mean_loss_history"], label="Mean", color="#2365A3")
-plt.plot(x, data["training_best_loss_history"], label="Best training loss", color="red")
-plt.plot(x, data["test_loss_train_size"], label="Best testing loss, train size", color="green")
-plt.plot(x, data["test_loss_test_size"], label="Best testing loss, test size", color="magenta")
-# Smoothing mean
-plt.plot(x, smooth_line(11, data["mean_loss_history"]), label="Smoothed mean", linewidth=3, color="black")
+plt.plot(x, smooth_mean, label="Smoothed mean with std", linewidth=3, color="#005F60")
+
+# Training raw data
+plt.plot(x, data["training_best_loss_history"], label="Best training loss", color="#249EA055")
 plt.plot(
-    x, smooth_line(11, data["training_best_loss_history"]), label="training_best_loss_history", linewidth=3, color="red"
+    x,
+    smooth_line(smoothing_factor, data["training_best_loss_history"]),
+    label="Smoothed",
+    linewidth=3,
+    color="#249EA0",
 )
-plt.plot(x, smooth_line(11, data["test_loss_train_size"]), label="test_loss_train_size", linewidth=3, color="green")
-plt.plot(x, smooth_line(11, data["test_loss_test_size"]), label="test_loss_test_size", linewidth=3, color="magenta")
+plt.plot(x, data["test_loss_train_size"], label="Best testing loss, train size", color="#FAAB3655")
+plt.plot(x, smooth_line(smoothing_factor, data["test_loss_train_size"]), label="Smoothed", linewidth=3, color="#FAAB36")
+plt.plot(x, data["test_loss_test_size"], label="Best testing loss, test size", color="#FD590155")
+plt.plot(x, smooth_line(smoothing_factor, data["test_loss_test_size"]), label="Smoothed", linewidth=3, color="#FD5901")
 
 
 plt.ylabel("Loss")
@@ -60,15 +70,22 @@ plt.legend()
 
 
 plt.figure()
-plt.plot(x, data["test_accuracy_train_size"], label="Train size")
-plt.plot(x, data["test_accuracy_test_size"], label="Test size")
+plt.plot(x, data["test_accuracy_train_size"], label="Train size", color="darkcyan")
+plt.plot(
+    x,
+    smooth_line(smoothing_factor, data["test_accuracy_train_size"]),
+    label="Smoothed",
+    linewidth=3,
+    color="darkcyan",
+)
+plt.plot(x, data["test_accuracy_test_size"], label="Test size", color="darkorange")
 # Smoothing accuracy
 plt.plot(
     x,
-    smooth_line(11, data["test_accuracy_train_size"]),
-    label="Smoothed accuracy, train size",
+    smooth_line(smoothing_factor, data["test_accuracy_test_size"]),
+    label="Smoothed",
     linewidth=3,
-    color="black",
+    color="darkorange",
 )
 
 plt.yticks(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10))

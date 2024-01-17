@@ -34,6 +34,9 @@ np.random.seed(0)
 random.seed(0)
 tf.random.set_seed(0)
 
+# TODO: Move code below to if __name__ == "__main__"
+
+# Parse arguments
 parser = argparse.ArgumentParser(
     prog="Main", description="This program runs an optimization.", epilog="Text at the bottom of help"
 )
@@ -53,6 +56,7 @@ parser.add_argument("-vn", "--vis_num", type=int, help="Number of inferences to 
 
 args = parser.parse_args()
 
+# Read config
 config.read("config")
 mnist_digits = eval(config.dataset.mnist_digits)
 loss_function = eval(config.training.loss)

@@ -3,16 +3,15 @@ import multiprocessing as mp
 import cma
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Flatten
-
-from column.src.mnist_processing import get_MNIST_data
-from column.src.utils import (
+from src.mnist_processing import get_MNIST_data
+from src.utils import (
     add_channels_single,
     add_channels_single_preexisting,
     get_flat_weights,
     get_model_weights,
     get_weights_info,
 )
+from tensorflow.keras.layers import Dense, Flatten
 
 MAXGEN = 10000
 THREADS = 4

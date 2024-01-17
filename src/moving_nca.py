@@ -11,7 +11,7 @@ from src.utils import (
     get_model_weights,
     get_weights_info,
 )
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Conv2D, Dense, Input
 
 CURRENT_POS = True
 
@@ -56,17 +56,28 @@ class MovingNCA(tf.keras.Model):
             ]
         )
 
+        """position = Input(2)
+        image = Input(shape=self.input_dim * 3 * 3)
+        reshapen_image = tf.layers.Reshape((3, 3, self.input_dim))(image)
+        conv = Conv2D(1, kernel_size=(3, 3), activation="linear", padding="valid")(reshapen_image)
+        input_img_plus_pos = tf.concat((conv, position), axis=-1)
+        probs = Conv2D(1, kernel_size=(1, 1), activation="sigmoid")(input_img_plus_pos)
+        self.dmodel = tf.models.Model(inputs=image, outputs=probs)"""
+
         self.reset()
 
         # dummy calls to build the model
         self.dmodel(tf.zeros([1, 3 * 3 * self.input_dim + 2]))
 
     def reset(self):
+        """
+        Resets the state by resetting the dmodel layers, the state and the perception matrix
+        """
         self.dmodel.reset_states()  # Reset the state if any dmodel.layers is stateful. If not, does nothing.
         self.perceptions = get_perception_matrix(
             self.size_image[0] - 2, self.size_image[1] - 2, self.size_neo[0], self.size_neo[1]
         )
-        # TODO: Why is this here? What is it?
+        # The internal state of the artificial neocortex needs to be reset as well
         self.state = np.zeros((self.size_image[0], self.size_image[1], self.input_dim - self.img_channels))
 
     # @tf.function
@@ -79,6 +90,18 @@ class MovingNCA(tf.keras.Model):
         return NotImplementedError()
 
     def classify(self, img_raw, visualize=False):
+        """
+        Classify the input image using the trained model.
+
+        Parameters:
+            img_raw (np.ndarray): The raw input image.
+            visualize (bool, optional): Whether to visualize the classification process. Defaults to False.
+
+        Returns:
+            np.ndarray: The state of the model after classification.
+            np.ndarray: The guesses made by the model.
+        """
+
         if visualize:
             images = []
             perceptions_through_time = []
@@ -164,7 +187,7 @@ class MovingNCA(tf.keras.Model):
         shaped_weight = get_model_weights(flat_weights, weight_amount_list, weight_shape_list)
         self.dmodel.set_weights(shaped_weight)
 
-        return None
+        return None  # Why does it explicitly return None?
 
 
 def custom_round_slicing(x: list):

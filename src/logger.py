@@ -7,21 +7,44 @@ import numpy as np
 
 class LoggerBase:
     def __init__(self, sub_folder=None):
+        """
+        LoggerBase has useful methods for all my projects.
+
+        Parameters:
+            sub_folder (str): The sub-folder to use for the initialization. Defaults to None.
+        """
         path = self.get_path(sub_folder)
         self.path = path
         self.make_experiment_folder(path, sub_folder)
 
     def save_config(self, config) -> None:
-        # Saves config of type localconfig Config
+        """
+        Saves the config of type `localconfig.Config` to a file.
+
+        Args:
+            config (localconfig.Config): The config object to be saved.
+        """
+        # There might already be a config file. Add a unique numerical suffix
         additive = 2
         filename = "/config"
         new_filename = filename
         while os.path.isfile(self.path + new_filename):
             new_filename = filename + "_" + str(additive)
             additive += 1
+
+        # We're safe to save the config
         config.save(self.path + new_filename)
 
     def get_path(self, sub_folder: str = None) -> str:
+        """
+        Generates a path for an experiment folder.
+
+        Args:
+            sub_folder (str, optional): The name of a sub-folder to append to the path. Defaults to None.
+
+        Returns:
+            str: The generated path for the experiment folder.
+        """
         path = "./experiments"
         if sub_folder is not None:
             path += "/" + sub_folder
@@ -36,12 +59,20 @@ class LoggerBase:
         return path
 
     def make_experiment_folder(self, path: str, sub_folder: str = None) -> None:
+        """
+        Create an experiment folder at the specified path.
+
+        Parameters:
+            path (str): The path where the experiment folder will be created.
+            sub_folder (str, optional): The sub-folder within the experiment folder. Defaults to None.
+        """
         if not os.path.isdir("./experiments"):
             os.mkdir("./experiments")
         if sub_folder is not None:
             if not os.path.isdir("./experiments" + "/" + sub_folder):
                 os.mkdir("./experiments" + "/" + sub_folder)
 
+        # Sometimes, the path is already made. Add a unique numerical suffix
         additive = 2
         new_path = path
         while os.path.isdir(new_path):
@@ -56,6 +87,16 @@ class LoggerBase:
 
 class Logger(LoggerBase):
     def __init__(self, config, sub_folder=None, save=False):
+        """
+        Logger is the specific logger class for this project.
+
+        :param config: The configuration object.
+        :type config: Config
+        :param sub_folder: The sub-folder to save the data in.
+        :type sub_folder: str, optional
+        :param save: Flag to indicate if the data should be saved.
+        :type save: bool, optional
+        """
         if save:
             super().__init__(sub_folder)
             self.save_config(config)
@@ -77,6 +118,18 @@ class Logger(LoggerBase):
 
     @staticmethod
     def continue_run(config, path, save=False):
+        """
+        Generate a logger object for continuing a run.
+
+        Args:
+            config (object): The configuration object for the run.
+            path (str): The path where the logger object will be saved.
+            save (bool, optional): Whether to save the configuration object. Defaults to False.
+
+        Returns:
+            object: The logger object for the continued run.
+        """
+        # We don't want to save the config because init always makes a unique experiment folder, which is the wrong place to store the new data
         logger_object = Logger(config, save=False)
         logger_object.path = path
         if save:

@@ -9,8 +9,8 @@ predicting_method = highest_vote
 [SCALE]
 train_n_neo = 15
 train_m_neo = 15
-test_n_neo = 26
-test_m_neo = 26
+test_n_neo = 15
+test_m_neo = 15
 
 [LOGGING]
 saving_interval = 50
