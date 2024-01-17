@@ -1,6 +1,8 @@
 # A cortical column inspired system
 
-This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). Therefore, a system inspired by the columnar neocortex is created and stress tested to asses its properties. It is applied to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like ones typically used for robot control with message passing. 
+This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). Therefore, I have created a system inspired by the columnar neocortex, and use the whisker barrel cortex as close inspiration. It has an architecture where identical modules process their neighborhood to classify objects. They can also move about in the sensor space, and process neighborhoods there, as seen in the figure below.  
+
+It is applied to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like ones typically used for robot control with message passing. 
 
 ![A cute rat](img/project_description.png)
 
@@ -12,8 +14,6 @@ The system can be used for
 3. Potentially zero-shot scalable robot bodies for classification
 
 It's still in progress.
-
-Just testing if I can still edit?
 
 ## Code structure
 
