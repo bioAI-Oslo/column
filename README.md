@@ -1,15 +1,15 @@
 # A cortical column inspired system
 
-This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). I want to apply it to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like Nadizar et al's for use in robot bodies. 
+This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). Therefore, a system inspired by the columnar neocortex is created and stress tested to asses its properties. It is applied to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like ones typically used for robot control with message passing. 
 
-![A cute mouse](img/project_description.png)
+![A cute rat](img/project_description.png)
 
-With the fully formed system, I intend to test it for various forms of robustness, scalability, and adaptability. I also want to test different forms of teaching the system, like input information and specific loss.
+The fully formed system will be tested for various forms of robustness, scalability, and adaptability. I also want to test different forms of teaching the system, like input information and specific loss.
 
 The system can be used for 
 1. Investigating properties of homogeneous distributed neural network systems with and without movement for engineering
 2. ... Or for theorizing about neocortex?
-3. Potentially zero-shot scalable robot bodies for classification?
+3. Potentially zero-shot scalable robot bodies for classification
 
 It's still in progress.
 
