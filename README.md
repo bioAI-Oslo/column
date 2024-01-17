@@ -2,6 +2,8 @@
 
 This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). I want to apply it to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like Nadizar et al's for use in robot bodies. 
 
+![A cute mouse](img/project_description.png)
+
 With the fully formed system, I intend to test it for various forms of robustness, scalability, and adaptability. I also want to test different forms of teaching the system, like input information and specific loss.
 
 The system can be used for 
