@@ -1,16 +1,16 @@
 [TRAINING]
-maxgen = 3000
+maxgen = 3
 popsize = 30
-threads = 30
+threads = 4
 pool_training = False 
-loss = pixel_wise_CE
+loss = pixel_wise_L2
 predicting_method = highest_vote
 
 [SCALE]
 train_n_neo = 15
 train_m_neo = 15
-test_n_neo = 15
-test_m_neo = 15
+test_n_neo = 26
+test_m_neo = 26
 
 [LOGGING]
 saving_interval = 50
@@ -18,12 +18,12 @@ plotting_interval = 30
 visualize_interval = 70000
 
 [DATASET]
-mnist_digits = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-samples_per_digit = 3
+mnist_digits = (0, 1)
+samples_per_digit = 1
 
 [NETWORK]
-hidden_channels = 5
+hidden_channels = 1
 img_channels = 1
-iterations = 30
+iterations = 10
 moving = True
 current_pos = True
