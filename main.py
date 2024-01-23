@@ -28,11 +28,13 @@ warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
 warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
-import random
+deterministic = False
+if deterministic:
+    import random
 
-np.random.seed(0)
-random.seed(0)
-tf.random.set_seed(0)
+    np.random.seed(0)
+    random.seed(0)
+    tf.random.set_seed(0)
 
 
 # Evaluate one solution
@@ -110,8 +112,11 @@ def run_optimize(
     else:
         init_sol = int(weight_amount.numpy()) * [0.0]
 
-    es = cma.CMAEvolutionStrategy(init_sol, 0.001)  # 0.001
-    np.random.seed(0)  # TODO: REMOVE THIS
+    es = cma.CMAEvolutionStrategy(init_sol, config.training.init_sigma)  # 0.001
+    if deterministic:
+        # CMAEvolutionStrategy does not allow you to set seed in any normal way
+        # So I set it here
+        np.random.seed(0)
 
     weight_amount = None
     init_sol = None

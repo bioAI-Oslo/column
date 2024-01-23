@@ -1,6 +1,7 @@
 [TRAINING]
 maxgen = 3
 popsize = 30
+init_sigma = 0.001
 threads = 4
 pool_training = False 
 loss = pixel_wise_L2
