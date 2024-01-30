@@ -51,7 +51,7 @@ def highest_value(class_images):
 
 
 def highest_vote(class_images):
-    votes = np.zeros(len(class_images))
+    votes = np.zeros(class_images.shape[-1])
     for x in range(len(class_images)):
         for y in range(len(class_images[0])):
             votes[np.argmax(class_images[x, y])] += 1

@@ -1,5 +1,5 @@
 [TRAINING]
-maxgen = 3
+maxgen = 3000
 popsize = 30
 init_sigma = 0.001
 threads = 4
@@ -14,17 +14,17 @@ test_n_neo = 26
 test_m_neo = 26
 
 [LOGGING]
-saving_interval = 50
-plotting_interval = 30
+saving_interval = 100
+plotting_interval = 20
 visualize_interval = 70000
 
 [DATASET]
-mnist_digits = (0, 1)
-samples_per_digit = 1
+mnist_digits = (0, 1, 2)
+samples_per_digit = 20
 
 [NETWORK]
-hidden_channels = 1
+hidden_channels = 2
 img_channels = 1
-iterations = 10
+iterations = 30
 moving = True
 current_pos = True

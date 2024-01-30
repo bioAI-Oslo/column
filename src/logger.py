@@ -21,7 +21,7 @@ class LoggerBase:
         """
         Saves the config of type `localconfig.Config` to a file.
 
-        Args:
+        Parameters:
             config (localconfig.Config): The config object to be saved.
         """
         # There might already be a config file. Add a unique numerical suffix
@@ -39,7 +39,7 @@ class LoggerBase:
         """
         Generates a path for an experiment folder.
 
-        Args:
+        Parameters:
             sub_folder (str, optional): The name of a sub-folder to append to the path. Defaults to None.
 
         Returns:
@@ -58,44 +58,44 @@ class LoggerBase:
 
         return path
 
-    def make_experiment_folder(self, path: str, sub_folder: str = None) -> None:
-        """
-        Create an experiment folder at the specified path.
 
-        Parameters:
-            path (str): The path where the experiment folder will be created.
-            sub_folder (str, optional): The sub-folder within the experiment folder. Defaults to None.
-        """
-        if not os.path.isdir("./experiments"):
-            os.mkdir("./experiments")
-        if sub_folder is not None:
-            if not os.path.isdir("./experiments" + "/" + sub_folder):
-                os.mkdir("./experiments" + "/" + sub_folder)
+def make_experiment_folder(self, path: str, sub_folder: str = None) -> None:
+    """
+    Create an experiment folder at the specified path.
 
-        # Sometimes, the path is already made. Add a unique numerical suffix
-        additive = 2
-        new_path = path
-        while os.path.isdir(new_path):
-            new_path = path + "_" + str(additive)
-            additive += 1
+    Parameters:
+        path (str): The path where the experiment folder will be created.
+        sub_folder (str, optional): The sub-folder within the experiment folder. Defaults to None.
+    """
+    experiment_dir = "./experiments"
+    if not os.path.isdir(experiment_dir):
+        os.mkdir(experiment_dir)
+    if sub_folder is not None:
+        if not os.path.isdir(experiment_dir + "/" + sub_folder):
+            os.mkdir(experiment_dir + "/" + sub_folder)
 
-        # We are safe to make the folder
-        os.mkdir(new_path)
-        print("The folder", new_path, "has been made")
-        self.path = new_path
+    # Sometimes, the path is already made. Add a unique numerical suffix
+    additive = 2
+    new_path = path
+    while os.path.isdir(new_path):
+        new_path = path + "_" + str(additive)
+        additive += 1
+
+    # We are safe to make the folder
+    os.mkdir(new_path)
+    print("The folder", new_path, "has been made")
+    self.path = new_path
 
 
 class Logger(LoggerBase):
     def __init__(self, config, sub_folder=None, save=False):
         """
-        Logger is the specific logger class for this project.
+        Initialize the object with the given configuration and optional sub-folder and save flag.
 
-        :param config: The configuration object.
-        :type config: Config
-        :param sub_folder: The sub-folder to save the data in.
-        :type sub_folder: str, optional
-        :param save: Flag to indicate if the data should be saved.
-        :type save: bool, optional
+        Parameters:
+            config (object): The configuration object.
+            sub_folder (str, optional): The sub-folder to use. Defaults to None.
+            save (bool, optional): Flag to save the configuration. Defaults to False.
         """
         if save:
             super().__init__(sub_folder)
@@ -121,7 +121,7 @@ class Logger(LoggerBase):
         """
         Generate a logger object for continuing a run.
 
-        Args:
+        Parameters:
             config (object): The configuration object for the run.
             path (str): The path where the logger object will be saved.
             save (bool, optional): Whether to save the configuration object. Defaults to False.
@@ -146,7 +146,7 @@ class Logger(LoggerBase):
     def load_checkpoint(path):
         best_solution = None
 
-        with open(path + "/best_network", "r") as file:
+        with open(path + "/bestever_network", "r") as file:
             best_solution = json.loads(file.read())
             file.close()
 

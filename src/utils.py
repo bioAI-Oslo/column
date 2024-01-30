@@ -9,6 +9,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from localconfig import config
 
 
 # Sidney's function
@@ -68,6 +69,30 @@ def add_channels_single_preexisting(img: np.ndarray, channels: np.ndarray):
     # img = img[:,:,np.newaxis]
 
     return np.concatenate((img, channels), axis=2)
+
+
+# Mia's function
+def get_config(path):
+    config.read(path + "/config")
+
+    return config
+
+
+# Mia's function
+def translate(image_batch, new_length: tuple):
+    assert len(image_batch.shape) == 3, "Translate only works with batches of NxM images"
+    _, N, M = image_batch.shape
+    new_length = (new_length[0] - N, new_length[1] - M)
+    new_image_batch = []
+    for image in image_batch:
+        random_split_i = np.random.randint(0, new_length[0])
+        rest_i = new_length[0] - random_split_i
+        random_split_j = np.random.randint(0, new_length[1])
+        rest_j = new_length[1] - random_split_j
+        new_image_batch.append(np.pad(image, ((random_split_i, rest_i), (random_split_j, rest_j)), "constant"))
+
+    new_image_batch = np.array(new_image_batch)
+    return new_image_batch
 
 
 if __name__ == "__main__":
