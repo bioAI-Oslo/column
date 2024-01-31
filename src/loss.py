@@ -3,6 +3,10 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 
+def pixel_wise_L2_and_CE(img, guesses, expected):
+    return pixel_wise_L2(img, guesses, expected) / 2 + pixel_wise_CE(img, guesses, expected) / 2
+
+
 def pixel_wise_L2(img, guesses, expected):
     N, M, O = img.shape
     loss = 0

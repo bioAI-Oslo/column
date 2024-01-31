@@ -2,6 +2,8 @@ import numpy as np
 
 
 def get_perception_matrix_mine(N, M, N_cells, M_cells):
+    if N_cells == M_cells == 1:
+        return np.array([[[N // 2, M // 2]]])
     Sx = (N_cells - 1) / (N - 1)  # Scaling factor x
     Sy = (M_cells - 1) / (M - 1)  # Scaling factor y
     A = np.array([[Sx, 0], [0, Sy]])  # Scaling matrix
@@ -26,6 +28,11 @@ def get_perception_matrix_NxM(N, M):
 
 # Optimized with ChatGPTs help
 def get_perception_matrix(N, M, N_cells, M_cells):
+    """
+    Look at get_perception_matrix_mine for the original version.
+    It is also easier to understand, but it is slower.
+    These two functions do the same.
+    """
     if N_cells == M_cells == 1:
         return np.array([[[N // 2, M // 2]]])
     x_new = np.arange(N_cells)
@@ -46,24 +53,25 @@ def get_perception_matrix(N, M, N_cells, M_cells):
 
 
 if __name__ == "__main__":
-    N, M = 26, 26
-    N_cells, M_cells = 13, 13
+    N, M = 4, 4
+    N_cells, M_cells = 3, 3
 
     perceptions_GPT = get_perception_matrix(N, M, N_cells, M_cells)
 
-    """# Plotting
-    a = np.random.rand(N+2,M+2)*0.1
+    # Plotting
+    a = np.random.rand(N + 2, M + 2) * 0.1
+    import matplotlib.pyplot as plt
 
-    for row in perceptions:
+    for row in perceptions_GPT:
         for x, y in row:
-            a[x,y] += 1
+            a[x, y] += 1
 
     plt.imshow(a)
-    plt.show()"""
+    plt.show()
 
-    perceptions_mine = get_perception_matrix_mine(N, M, N_cells, M_cells)
+    """perceptions_mine = get_perception_matrix_mine(N, M, N_cells, M_cells)
 
     for x in range(N_cells):
         for y in range(M_cells):
             print(perceptions_GPT[x, y], end=" ")
-            print(perceptions_mine[x, y])
+            print(perceptions_mine[x, y])"""

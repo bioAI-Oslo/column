@@ -19,7 +19,7 @@ from src.mnist_processing import get_MNIST_data
 from src.utils import get_config, translate
 from tqdm import tqdm
 
-path = "experiments/tuning/29-1-24_11:41_3"
+path = "experiments/30-1-24_16:57"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 

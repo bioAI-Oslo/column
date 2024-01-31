@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 sns.set()
 
-path = "experiments/tuning/29-1-24_11:41_3"
+path = "experiments/30-1-24_16:57"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 
@@ -31,7 +31,7 @@ mnist_digits = eval(config.dataset.mnist_digits)
 data_func = get_MNIST_data
 kwargs = {
     "MNIST_DIGITS": mnist_digits,
-    "SAMPLES_PER_DIGIT": 1,
+    "SAMPLES_PER_DIGIT": 10,
     "verbose": False,
     "test": True,
 }
@@ -55,7 +55,7 @@ even_or_odd = [odd, even]
 
 sizes = np.arange(28 // 4, 28 * 2, 2)  # Starts on 7
 
-for size in sizes:
+for size in tqdm(sizes):
     for i in range(2):
         resized_x_data = []
         for img, lab in zip(x_data, y_data):
