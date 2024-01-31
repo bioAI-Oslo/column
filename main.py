@@ -17,6 +17,7 @@ from src.loss import (
     highest_value,
     highest_vote,
     pixel_wise_CE,
+    pixel_wise_CE_and_energy,
     pixel_wise_L2,
     pixel_wise_L2_and_CE,
     scale_loss,
