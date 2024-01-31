@@ -58,33 +58,32 @@ class LoggerBase:
 
         return path
 
+    def make_experiment_folder(self, path: str, sub_folder: str = None) -> None:
+        """
+        Create an experiment folder at the specified path.
 
-def make_experiment_folder(self, path: str, sub_folder: str = None) -> None:
-    """
-    Create an experiment folder at the specified path.
+        Parameters:
+            path (str): The path where the experiment folder will be created.
+            sub_folder (str, optional): The sub-folder within the experiment folder. Defaults to None.
+        """
+        experiment_dir = "./experiments"
+        if not os.path.isdir(experiment_dir):
+            os.mkdir(experiment_dir)
+        if sub_folder is not None:
+            if not os.path.isdir(experiment_dir + "/" + sub_folder):
+                os.mkdir(experiment_dir + "/" + sub_folder)
 
-    Parameters:
-        path (str): The path where the experiment folder will be created.
-        sub_folder (str, optional): The sub-folder within the experiment folder. Defaults to None.
-    """
-    experiment_dir = "./experiments"
-    if not os.path.isdir(experiment_dir):
-        os.mkdir(experiment_dir)
-    if sub_folder is not None:
-        if not os.path.isdir(experiment_dir + "/" + sub_folder):
-            os.mkdir(experiment_dir + "/" + sub_folder)
+        # Sometimes, the path is already made. Add a unique numerical suffix
+        additive = 2
+        new_path = path
+        while os.path.isdir(new_path):
+            new_path = path + "_" + str(additive)
+            additive += 1
 
-    # Sometimes, the path is already made. Add a unique numerical suffix
-    additive = 2
-    new_path = path
-    while os.path.isdir(new_path):
-        new_path = path + "_" + str(additive)
-        additive += 1
-
-    # We are safe to make the folder
-    os.mkdir(new_path)
-    print("The folder", new_path, "has been made")
-    self.path = new_path
+        # We are safe to make the folder
+        os.mkdir(new_path)
+        print("The folder", new_path, "has been made")
+        self.path = new_path
 
 
 class Logger(LoggerBase):
