@@ -3,11 +3,24 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 
+def pixel_wise_CE_and_energy(img, guesses, expected):
+    return pixel_wise_CE(img, guesses, expected) + energy(img, guesses, expected)
+
+
+def energy(img, guesses, expected):
+    return np.sum(img) * 0.0001
+
+
 def pixel_wise_L2_and_CE(img, guesses, expected):
     return pixel_wise_L2(img, guesses, expected) / 2 + pixel_wise_CE(img, guesses, expected) / 2
 
 
 def pixel_wise_L2(img, guesses, expected):
+    """Alternative implementation
+    N, M, O = img.shape
+    predicted = np.reshape(img, (N * M, O))
+    expected = [expected for _ in range(len(predicted))]
+    return float(tf.keras.losses.MeanSquaredError()(expected, predicted))"""
     N, M, O = img.shape
     loss = 0
     for guess in np.reshape(img, (N * M, O)):
