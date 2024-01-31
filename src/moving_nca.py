@@ -49,9 +49,17 @@ class MovingNCA(tf.keras.Model):
         self.mnist_digits = mnist_digits
 
         # Original architecture
-        self.dmodel = tf.keras.Sequential(
+        """self.dmodel = tf.keras.Sequential(
             [
                 Dense(self.input_dim * 3 * 3 + 2, input_dim=self.input_dim * 3 * 3 + 2, activation="linear"),
+                Dense(self.output_dim, activation="linear"),  # or linear
+            ]
+        )"""
+
+        # Testing architecture 31-1-2024 18:53
+        self.dmodel = tf.keras.Sequential(
+            [
+                Dense(20, input_dim=self.input_dim * 3 * 3 + 2, activation="linear"),
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
         )
