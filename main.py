@@ -18,6 +18,7 @@ from src.loss import (
     highest_vote,
     pixel_wise_CE,
     pixel_wise_L2,
+    pixel_wise_L2_and_CE,
     scale_loss,
 )
 from src.mnist_processing import get_MNIST_data
