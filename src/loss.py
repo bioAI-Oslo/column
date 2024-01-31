@@ -8,7 +8,7 @@ def pixel_wise_CE_and_energy(img, guesses, expected):
 
 
 def energy(img, guesses, expected):
-    return np.sum(img) * 0.0001
+    return np.sum(img**2) * 0.0001
 
 
 def pixel_wise_L2_and_CE(img, guesses, expected):
