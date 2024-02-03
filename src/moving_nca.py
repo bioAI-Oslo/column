@@ -21,6 +21,7 @@ class MovingNCA(tf.keras.Model):
         self,
         num_classes,
         num_hidden,
+        hidden_neurons,
         iterations,
         current_pos,
         size_neo=None,
@@ -49,12 +50,12 @@ class MovingNCA(tf.keras.Model):
         self.mnist_digits = mnist_digits
 
         # Original architecture
-        self.dmodel = tf.keras.Sequential(
+        """self.dmodel = tf.keras.Sequential(
             [
                 Dense(self.input_dim * 3 * 3 + 2, input_dim=self.input_dim * 3 * 3 + 2, activation="linear"),
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
-        )
+        )"""
 
         # Testing architecture 31-1-2024 18:53
         """self.dmodel = tf.keras.Sequential(
@@ -63,6 +64,14 @@ class MovingNCA(tf.keras.Model):
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
         )"""
+
+        # Adjustable size
+        self.dmodel = tf.keras.Sequential(
+            [
+                Dense(hidden_neurons, input_dim=self.input_dim * 3 * 3 + 2, activation="linear"),
+                Dense(self.output_dim, activation="linear"),  # or linear
+            ]
+        )
 
         """position = Input(2)
         image = Input(shape=self.input_dim * 3 * 3)
@@ -170,6 +179,7 @@ class MovingNCA(tf.keras.Model):
         flat_weights,
         num_classes,
         num_hidden,
+        hidden_neurons,
         iterations,
         current_pos,
         size_neo=None,
@@ -180,6 +190,7 @@ class MovingNCA(tf.keras.Model):
         network = MovingNCA(
             num_classes=num_classes,
             num_hidden=num_hidden,
+            hidden_neurons=hidden_neurons,
             iterations=iterations,
             current_pos=current_pos,
             size_neo=size_neo,

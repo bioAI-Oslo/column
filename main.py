@@ -289,6 +289,7 @@ if __name__ == "__main__":
         "size_image": (28, 28),
         "num_classes": len(mnist_digits),
         "num_hidden": config.network.hidden_channels,
+        "hidden_neurons": config.network.hidden_neurons,
         "iterations": config.network.iterations,
         "current_pos": config.network.current_pos,
         "moving": config.network.moving,
