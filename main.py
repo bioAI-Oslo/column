@@ -24,6 +24,7 @@ from src.loss import (
 )
 from src.mnist_processing import (
     get_MNIST_data,
+    get_MNIST_data_padded,
     get_MNIST_data_resized,
     get_MNIST_data_translated,
 )
@@ -321,6 +322,9 @@ if __name__ == "__main__":
     elif config.dataset.data_func == "get_MNIST_data_translated":
         # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
         moving_nca_kwargs["size_image"] = (70, 70)
+    elif config.dataset.data_func == "get_MNIST_data_padded":
+        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
+        moving_nca_kwargs["size_image"] = (56, 56)
 
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:

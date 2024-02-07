@@ -22,6 +22,15 @@ sorted_X_train = None
 sorted_X_test = None
 
 
+def get_MNIST_data_padded(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False):
+    training_data, target_data = get_MNIST_data(MNIST_DIGITS, SAMPLES_PER_DIGIT, verbose, test)
+
+    diff_x, diff_y = 14, 14
+    training_data = np.pad(training_data, ((0, 0), (diff_x, diff_y), (diff_x, diff_y)), "constant")
+
+    return training_data, target_data
+
+
 def get_MNIST_data_resized(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, size=56, verbose=False, test=False):
     training_data, target_data = get_MNIST_data(MNIST_DIGITS, SAMPLES_PER_DIGIT, verbose, test)
 
