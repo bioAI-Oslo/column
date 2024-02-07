@@ -12,7 +12,9 @@ from src.loss import (
     highest_value,
     highest_vote,
     pixel_wise_CE,
+    pixel_wise_CE_and_energy,
     pixel_wise_L2,
+    pixel_wise_L2_and_CE,
     scale_loss,
 )
 from src.mnist_processing import get_MNIST_data
@@ -22,7 +24,7 @@ from tqdm import tqdm
 
 sns.set()
 
-path = "experiments/30-1-24_16:57"
+path = "experiments/tuning_size/3-2-24_17:28"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 
@@ -67,6 +69,7 @@ for size in tqdm(sizes):
             "size_image": (size + i, size + i),
             "num_classes": len(mnist_digits),
             "num_hidden": config.network.hidden_channels,
+            "hidden_neurons": config.network.hidden_neurons,
             "iterations": config.network.iterations,
             "current_pos": config.network.current_pos,
             "moving": config.network.moving,

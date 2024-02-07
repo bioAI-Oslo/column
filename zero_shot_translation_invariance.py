@@ -12,14 +12,16 @@ from src.loss import (
     highest_value,
     highest_vote,
     pixel_wise_CE,
+    pixel_wise_CE_and_energy,
     pixel_wise_L2,
+    pixel_wise_L2_and_CE,
     scale_loss,
 )
 from src.mnist_processing import get_MNIST_data
 from src.utils import get_config, translate
 from tqdm import tqdm
 
-path = "experiments/30-1-24_16:57"
+path = "experiments/31-1-24_19:43"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 

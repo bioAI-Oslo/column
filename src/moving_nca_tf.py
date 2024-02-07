@@ -50,21 +50,55 @@ class MovingNCA(tf.keras.Model):
         self.mnist_digits = mnist_digits
 
         # Adjustable size
-        self.dmodel = tf.keras.Sequential(
-            [
-                Dense(
-                    hidden_neurons,
-                    input_dim=self.input_dim * 3 * 3 + self.position_addon,
-                    activation="linear",
-                ),
-                Dense(self.output_dim, activation="linear"),  # or linear
-            ]
-        )
+        self.define_model()
+
+        # Function to stop gradients for a layer
+        def stop_gradients_for_layer(layer):
+            if isinstance(layer, tf.keras.layers.Dense):
+                layer.kernel = tf.stop_gradient(layer.kernel)
+                layer.bias = tf.stop_gradient(layer.bias)
+            return layer
+
+        # Apply stop_gradients_for_layer function to each layer in the model
+        for i, layer in enumerate(self.dmodel.layers):
+            self.dmodel.layers[i] = stop_gradients_for_layer(layer)
 
         self.reset()
 
-        # dummy calls to build the model
-        self.dmodel(tf.zeros([1, 3 * 3 * self.input_dim + self.position_addon]))
+        # Let's make some dummy data to build the model
+        inp = np.zeros((self.size_image[0], self.size_image[1], self.img_channels))
+        state_inp = np.zeros((self.size_neo[0] + 2, self.size_neo[1] + 2, self.input_dim - self.img_channels))
+
+        # Standard perception matrix also as dummy data
+        self_perceptions_expanded = expand(self.perceptions)
+
+        # Padding with None for tf reasons and expanding perception matrix
+        inp_batch, state_batch = self.prepare_for_dmodel(inp)
+
+        # Dummy calls to build the model
+        self.dmodel([inp_batch, state_batch])
+
+    def define_model(self):
+        N_neo, M_neo = self.size_neo
+
+        # Processing state
+        state = Input(shape=(N_neo + 2, M_neo + 2, self.input_dim - self.img_channels))  # 1 x N_neo+2 x M_neo+2 x 2
+        comms = Conv2D(1, kernel_size=(3, 3), strides=(1, 1), activation="linear", padding="valid")(
+            state
+        )  # 1 x N_neo x M_neo x 1
+
+        # Processing perception
+        # Image will already be gathered version of perception
+        image = Input(shape=(N_neo * 3, M_neo * 3, self.img_channels))  # 1 x N_neo*3 x M_neo*3 x 1
+        perception = Conv2D(1, kernel_size=(3, 3), strides=(3, 3), activation="linear", padding="valid")(
+            image
+        )  # 1 x N_neo x M_neo x 1
+        full_in = tf.concat((comms, perception), axis=-1)  # 1 x N_neo x M_neo x 2
+
+        probs = Conv2D(self.output_dim, kernel_size=(1, 1), activation="sigmoid")(full_in)  # 1 x N_neo x M_neo x 1
+        self.dmodel = tf.keras.Model(inputs=[image, state], outputs=probs)
+
+        # self.dmodel.summary()
 
     def reset(self):
         """
@@ -75,7 +109,14 @@ class MovingNCA(tf.keras.Model):
             self.size_image[0] - 2, self.size_image[1] - 2, self.size_neo[0], self.size_neo[1]
         )
         # The internal state of the artificial neocortex needs to be reset as well
-        self.state = np.zeros((self.size_image[0], self.size_image[1], self.input_dim - self.img_channels))
+        self.state = np.zeros((self.size_neo[0] + 2, self.size_neo[1] + 2, self.input_dim - self.img_channels))
+
+    def prepare_for_dmodel(self, inp):
+        self_perceptions_expanded = expand(self.perceptions)
+        # gathered = tf.gather_nd(params=inp_batch, indices=self_perceptions_expanded, batch_dims=1)
+        gathered = gather_mine(inp, self_perceptions_expanded)
+
+        return gathered[None], self.state[None]
 
     # @tf.function
     def call(self, img, visualize=False):
@@ -110,13 +151,12 @@ class MovingNCA(tf.keras.Model):
 
         guesses = None
         for _ in range(self.iterations):
-            input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
-            collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo)
+            # Padding with None to resemble a batch and expanding perception matrix
+            inp_batch, state_batch = self.prepare_for_dmodel(img_raw)
 
-            guesses = self.dmodel(input)
-            guesses = guesses.numpy()
-
-            outputs = np.reshape(guesses[:, :], (N_neo, M_neo, self.output_dim))
+            # Dummy calls to build the model
+            outputs = self.dmodel([inp_batch, state_batch])[0]
+            outputs = outputs.numpy()
 
             self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] + outputs[:, :, : self.input_dim - self.img_channels]
@@ -235,29 +275,54 @@ def alter_perception_slicing(perceptions, actions, N_neo, M_neo, N_active, M_act
     add_action_slicing(perceptions, actions, N_active, M_active)
 
 
-@jit
-def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
-    N, M, _ = state.shape
-    for x in range(N_neo):
-        for y in range(M_neo):
-            x_p, y_p = perceptions[x, y]
-            perc = img[x_p : x_p + 3, y_p : y_p + 3, :1]
-            comms = state[x : x + 3, y : y + 3, :]
-            dummy = np.concatenate((perc, comms), axis=2)
-            dummy_flat = dummy.flatten()
-            input[x * M_neo + y, : len(dummy_flat)] = dummy_flat
-
-            # When position is None, the input is just the perception and comms
-            if position == "current":
-                input[x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
-                input[x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
-            elif position == "initial":
-                input[x * M_neo + y, -2] = (float(x) * N / float(N_neo) - N // 2) / (N // 2)
-                input[x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
-
-
 def get_dimensions(data_shape, N_neo, M_neo):
     N, M = data_shape
     N_neo = N - 2 if N_neo is None else N_neo
     M_neo = M - 2 if M_neo is None else M_neo
     return N_neo, M_neo
+
+
+def test_expand():
+    arr = np.array([[[0, 0], [0, 1], [0, 2]], [[1, 0], [1, 1], [1, 2]], [[2, 0], [2, 1], [2, 2]]])
+
+    arr_expanded = np.array(
+        [
+            [[0, 0], [0, 1], [0, 2], [0, 1], [0, 2], [0, 3], [0, 2], [0, 3], [0, 4]],
+            [[1, 0], [1, 1], [1, 2], [1, 1], [1, 2], [1, 3], [1, 2], [1, 3], [1, 4]],
+            [[2, 0], [2, 1], [2, 2], [2, 1], [2, 2], [2, 3], [2, 2], [2, 3], [2, 4]],
+            [[1, 0], [1, 1], [1, 2], [1, 1], [1, 2], [1, 3], [1, 2], [1, 3], [1, 4]],
+            [[2, 0], [2, 1], [2, 2], [2, 1], [2, 2], [2, 3], [2, 2], [2, 3], [2, 4]],
+            [[3, 0], [3, 1], [3, 2], [3, 1], [3, 2], [3, 3], [3, 2], [3, 3], [3, 4]],
+            [[2, 0], [2, 1], [2, 2], [2, 1], [2, 2], [2, 3], [2, 2], [2, 3], [2, 4]],
+            [[3, 0], [3, 1], [3, 2], [3, 1], [3, 2], [3, 3], [3, 2], [3, 3], [3, 4]],
+            [[4, 0], [4, 1], [4, 2], [4, 1], [4, 2], [4, 3], [4, 2], [4, 3], [4, 4]],
+        ]
+    )
+
+    for row_fasit, row_test in zip(arr_expanded, expand(arr)):
+        assert np.array_equal(row_fasit, row_test)
+
+
+def expand(arr):
+    N, M, _ = arr.shape
+    expanded_arr = np.zeros((N * 3, M * 3, 2), dtype=np.int32)
+    x_p, y_p = arr[:, :, 0], arr[:, :, 1]
+
+    for i in range(3):
+        for j in range(3):
+            expanded_arr[i::3, j::3, 0] = x_p + i
+            expanded_arr[i::3, j::3, 1] = y_p + j
+
+    return expanded_arr  # Fucking "in16" is not supported...
+
+
+@jit
+def gather_mine(arr, movement_expanded):
+    N_neo, M_neo, _ = movement_expanded.shape
+    new_arr = np.empty((N_neo, M_neo, arr.shape[2]), dtype=arr.dtype)
+
+    for x in range(N_neo // 3):
+        for y in range(M_neo // 3):
+            new_arr[x, y, :] = arr[movement_expanded[x, y, 0], movement_expanded[x, y, 1], :]
+
+    return new_arr

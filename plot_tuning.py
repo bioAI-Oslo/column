@@ -1,6 +1,7 @@
 """Script for plotting tuning results from the folder experiments/tuning. Should never be imported from. 
 If you want to do that, place those functions in plotting_utils.py"""
 import os
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,40 +15,42 @@ sns.set()
 ################################ FUNCTIONS ################################
 
 
-def get_sigmas(path):
-    sigmas = []
-    iterations = []
+def get_features(path, feature1, feature2):
+    feature1_list = []
+    feature2_list = []
 
     for sub_folder in os.listdir(path):
         sub_path = path + "/" + sub_folder
         if os.path.isdir(sub_path):
             config = get_config(sub_path)
 
-            if config.training.init_sigma not in sigmas:
-                sigmas.append(config.training.init_sigma)
-            if config.network.iterations not in iterations:
-                iterations.append(config.network.iterations)
+            if eval(f"config.{feature1}") not in feature1_list:
+                feature1_list.append(eval(f"config.{feature1}"))
+            if eval(f"config.{feature2}") not in feature2_list:
+                feature2_list.append(eval(f"config.{feature2}"))
 
-    sigmas = np.sort(sigmas)
-    iterations = np.sort(iterations)
+    feature1_list = np.sort(feature1_list)
+    feature2_list = np.sort(feature2_list)
 
-    return sigmas, iterations
+    return feature1_list, feature2_list
 
 
-def plot_heatmap(heatmap, title, high_is_worse=False):
+def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
     plt.title(title)
     sns.heatmap(heatmap, annot=True, cmap="plasma" if not high_is_worse else "plasma_r")
-    plt.yticks(np.arange(len(sigmas)) + 0.5, sigmas)
-    plt.xticks(np.arange(len(iterations)) + 0.5, iterations)
-    plt.ylabel("Sigma")
-    plt.xlabel("Iterations")
+    plt.yticks(np.arange(len(feature1_list)) + 0.5, feature1_list)
+    plt.xticks(np.arange(len(feature2_list)) + 0.5, feature2_list)
+    ylabel = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
+    xlabel = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
+    plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
 
 
 def plot_convergence_plots(convergence, title, ylabel, yticks=None):
     cmap = plt.cm.plasma
     count_lines = 0
-    for i in range(len(sigmas)):
-        for j in range(len(iterations)):
+    for i in range(len(feature1_list)):
+        for j in range(len(feature2_list)):
             if convergence_loss[i][j] == []:
                 continue
             count_lines += 1
@@ -55,8 +58,8 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
     plt.figure()
     plt.title(title)
     count_plotted = 0
-    for i in range(len(sigmas)):
-        for j in range(len(iterations)):
+    for i in range(len(feature1_list)):
+        for j in range(len(feature2_list)):
             if convergence[i][j] == []:
                 continue
             mean = np.mean(convergence[i][j], axis=0)
@@ -69,7 +72,7 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
             plt.plot(
                 x_axis[i][j][0],
                 mean,
-                label=str(sigmas[i]) + " " + str(iterations[j]),
+                label=str(feature1_list[i]) + " " + str(feature2_list[j]),
                 color=color,
             )
 
@@ -84,11 +87,15 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
 
 ######################################## HEATMAP ##########################################
 
-path = "./experiments/tuning"
+path = "./experiments/tuning_size"
 
-sigmas, iterations = get_sigmas(path)
+# Detect difference
+feature1, feature2 = "training.loss", "network.hidden_neurons"
 
-heatmap = lambda: [[[] for _ in range(len(iterations))] for _ in range(len(sigmas))]
+# Get feature 1 and feature 2
+feature1_list, feature2_list = get_features(path, feature1, feature2)
+
+heatmap = lambda: [[[] for _ in range(len(feature2_list))] for _ in range(len(feature1_list))]
 heatmap_loss_train = heatmap()
 heatmap_acc_train = heatmap()
 heatmap_loss_test = heatmap()
@@ -102,9 +109,9 @@ for sub_folder in os.listdir(path):
         data = get_plotting_data(sub_path)
         config = get_config(sub_path)
 
-        # Key in heatmap based on ordered sigma and iterations
-        key0 = np.where(sigmas == config.training.init_sigma)[0][0]
-        key1 = np.where(iterations == config.network.iterations)[0][0]
+        # Key in heatmap based on ordered feature 1 and feature 2
+        key0 = np.where(feature1_list == eval(f"config.{feature1}"))[0][0]
+        key1 = np.where(feature2_list == eval(f"config.{feature2}"))[0][0]
 
         # Add data to heatmap based on key
         heatmap_loss_train[key0][key1].append(data["bestever_score_history"][-1])
@@ -114,8 +121,8 @@ for sub_folder in os.listdir(path):
         heatmap_acc_test[key0][key1].append(data["test_accuracy_test_size"][-1])
 
 # Fill empty lists with 1 or 0 to not trip up np.mean
-for x in range(len(sigmas)):
-    for y in range(len(iterations)):
+for x in range(len(feature1_list)):
+    for y in range(len(feature2_list)):
         for hm in (heatmap_loss_train, heatmap_loss_test):
             if hm[x][y] == []:
                 hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Loss gets high value
@@ -132,14 +139,14 @@ heatmap_loss_test = np.mean(heatmap_loss_test, axis=2)
 # Plot heatmaps
 plt.figure()
 ax1 = plt.subplot(2, 1, 1)
-plot_heatmap(heatmap_loss_train, "Loss Train", high_is_worse=True)
+plot_heatmap(heatmap_loss_train, "Loss Train", feature1, feature2, high_is_worse=True)
 plt.subplot(2, 1, 2, sharex=ax1)
-plot_heatmap(heatmap_loss_test, "Loss Test", high_is_worse=True)
+plot_heatmap(heatmap_loss_test, "Loss Test", feature1, feature2, high_is_worse=True)
 plt.figure()
 ax1 = plt.subplot(2, 1, 1)
-plot_heatmap(heatmap_acc_train, "Accuracy Train", high_is_worse=False)
+plot_heatmap(heatmap_acc_train, "Accuracy Train", feature1, feature2, high_is_worse=False)
 plt.subplot(2, 1, 2, sharex=ax1)
-plot_heatmap(heatmap_acc_test, "Accuracy Test", high_is_worse=False)
+plot_heatmap(heatmap_acc_test, "Accuracy Test", feature1, feature2, high_is_worse=False)
 plt.show()
 
 ######################################## CONVERGENCE ##########################################
@@ -157,8 +164,8 @@ for sub_folder in os.listdir(path):
         config = get_config(sub_path)
 
         # Same as before
-        key0 = np.where(sigmas == config.training.init_sigma)[0][0]
-        key1 = np.where(iterations == config.network.iterations)[0][0]
+        key0 = np.where(feature1_list == eval(f"config.{feature1}"))[0][0]
+        key1 = np.where(feature2_list == eval(f"config.{feature2}"))[0][0]
 
         x_axis[key0][key1].append(data["x_axis"])
 

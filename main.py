@@ -22,7 +22,11 @@ from src.loss import (
     pixel_wise_L2_and_CE,
     scale_loss,
 )
-from src.mnist_processing import get_MNIST_data
+from src.mnist_processing import (
+    get_MNIST_data,
+    get_MNIST_data_resized,
+    get_MNIST_data_translated,
+)
 from src.moving_nca import MovingNCA
 from src.utils import get_weights_info
 
@@ -258,7 +262,7 @@ def run_optimize(
     return bestever_weights
 
 
-if __name__ == "__main__":
+def parse_args():
     # Parse arguments
     parser = argparse.ArgumentParser(
         prog="Main", description="This program runs an optimization.", epilog="Text at the bottom of help"
@@ -278,6 +282,12 @@ if __name__ == "__main__":
     parser.add_argument("-vn", "--vis_num", type=int, help="Number of inferences to visualize", default=1)
 
     args = parser.parse_args()
+    return args
+
+
+if __name__ == "__main__":
+    # Moved to its own function because of size.
+    args = parse_args()
 
     # Read config
     config.read(args.config)
@@ -285,25 +295,34 @@ if __name__ == "__main__":
     loss_function = eval(config.training.loss)
     predicting_method = eval(config.training.predicting_method)
 
+    # This parameter dictionary will be used for all instances of the network
     moving_nca_kwargs = {
-        "size_image": (28, 28),
+        "size_image": (28, 28),  # Changed below if we need to
         "num_classes": len(mnist_digits),
         "num_hidden": config.network.hidden_channels,
         "hidden_neurons": config.network.hidden_neurons,
         "iterations": config.network.iterations,
-        "current_pos": config.network.current_pos,
+        "position": config.network.position,
         "moving": config.network.moving,
         "mnist_digits": mnist_digits,
     }
 
-    # Script wide functions
-    data_func = get_MNIST_data
+    # Data function and kwargs
+    data_func = eval(config.dataset.data_func)
     kwargs = {
         "MNIST_DIGITS": mnist_digits,
         "SAMPLES_PER_DIGIT": config.dataset.samples_per_digit,
         "verbose": False,
     }
+    # Taking specific care with the data functions
+    if config.dataset.data_func == "get_MNIST_data_resized":
+        kwargs["size"] = config.dataset.size
+        moving_nca_kwargs["size_image"] = (config.dataset.size, config.dataset.size)
+    elif config.dataset.data_func == "get_MNIST_data_translated":
+        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
+        moving_nca_kwargs["size_image"] = (70, 70)
 
+    # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
         winner_flat = run_optimize(
             config=config,
@@ -319,6 +338,7 @@ if __name__ == "__main__":
     else:
         winner_flat = Logger.load_checkpoint(args.test_path)
 
+    # Get test data for new evaluation
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
