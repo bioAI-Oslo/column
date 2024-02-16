@@ -35,7 +35,7 @@ warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
 warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
-deterministic = True
+deterministic = False
 if deterministic:
     import random
 
@@ -62,7 +62,7 @@ def evaluate_nca_batch(
     silenced=0,
 ):
     """
-    Network creation took 0.10552453994750977
+    Network creation took 0.10552453994750977 # Amounts to 26 minutes extra across 15000 gens
     Reshape took 1.1682510375976562e-05 # Amounts to 1.5 seconds extra across 15000 gens
     Reset took 0.04755043983459473 # Amounts to 11 minutes extra across 15000 gens
     Classify took 0.29085350036621094 # Amounts to 1.2 hours extra across 15000 gens
@@ -75,30 +75,16 @@ def evaluate_nca_batch(
     assert visualize is False, "Batch currently does not support visualizing"
     assert silenced == 0, "Batch currently does not support silencing"
 
-    # start_time_eval = time.time()
-
-    # start_time = time.time()
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
-    # print("Network creation took", time.time() - start_time)
 
     B, N, M = training_data.shape
-
-    # start_time = time.time()
     images_raw = training_data.reshape(B, N, M, 1)
-    # print("Reshape took", time.time() - start_time)
 
-    # start_time = time.time()
     network.reset_batched(B)
-    # print("Reset took", time.time() - start_time)
-    # start_time = time.time()
     class_predictions, _ = network.classify_batch(images_raw, visualize=False)
-    # print("Classify took", time.time() - start_time)
 
-    # start_time = time.time()
     loss = loss_function(class_predictions, None, target_data)
-    # print("Loss took", time.time() - start_time)
 
-    # start_time = time.time()
     if return_accuracy:
         beliefs = predicting_method(class_predictions)
         accuracy = np.sum(beliefs == np.argmax(target_data, axis=-1))
@@ -106,9 +92,17 @@ def evaluate_nca_batch(
 
         if verbose:
             print("Accuracy:", np.round(accuracy * 100 / B, 2), "%")
-    # print("Predict took", time.time() - start_time)
 
-    # print("Eval took", time.time() - start_time_eval)
+    if return_confusion:
+        beliefs = predicting_method(class_predictions)
+        confusion = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.int32)
+        for b in range(B):
+            confusion[np.argmax(target_data[b]), beliefs[b]] += 1
+
+        if return_accuracy:
+            return loss, accuracy, confusion
+        return loss, confusion
+
     if return_accuracy:
         return loss, accuracy
     return loss
@@ -138,7 +132,6 @@ def evaluate_nca(
     Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
     Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
     """
-    # start_time_eval = time.time()
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     loss = 0
@@ -148,23 +141,17 @@ def evaluate_nca(
         if not pool_training or (pool_training and sample != 0 and sample % 2 == 0):
             network.reset()
 
-        # Code further on requires a 3D image. TODO See if this is necessary
-        # start_time = time.time()
+        # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
-        # print("Reshape time:", time.time() - start_time)
 
-        # start_time = time.time()
         class_predictions, guesses = network.classify(
             img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
         )
-        # print("Classification time:", time.time() - start_time)
 
         if visualize and (visualized < args.vis_num):
             visualized += 1
 
-        # start_time = time.time()
         loss += loss_function(class_predictions, guesses, expected)
-        # print("Loss time:", time.time() - start_time)
 
         if verbose or return_accuracy:
             belief = np.mean(class_predictions, axis=(0, 1))
@@ -178,7 +165,6 @@ def evaluate_nca(
         print("Accuracy:", np.round(accuracy * 100 / training_data.shape[0], 2), "%")
 
     scaled_loss = scale_loss(loss, training_data.shape[0])
-    # print("Eval took", time.time() - start_time_eval)
     if return_accuracy:
         return scaled_loss, float(accuracy) / float(training_data.shape[0])
     return scaled_loss
@@ -239,6 +225,16 @@ def run_optimize(
     bestever_score = np.inf
     bestever_weights = None
 
+    """
+    Solutions took 0.022756099700927734
+    Training data took 0.00043892860412597656
+    Evaluations took 1.0909454822540283
+    Tell took 0.0347287654876709
+    Bestever took 9.036064147949219e-05
+    Plotting took 0.5259389877319336
+    Saving took 0.006429910659790039
+    """
+
     try:
         start_run_time = time.time()
         for g in generation_numbers:
@@ -247,14 +243,10 @@ def run_optimize(
             print("Generation", g, flush=True)
 
             # Get candidate solutions based on CMA-ES internal parameters
-            start_time = time.time()
             solutions = es.ask(number=config.training.popsize)  # , sigma_fac=(((MAXGEN-g)/MAXGEN)*0.9)+0.1)
-            print("Solutions took", time.time() - start_time)
 
             # Generate training data for evaluating each candidate solution
-            start_time = time.time()
             training_data, target_data = data_func(**data_kwargs)
-            print("Training data took", time.time() - start_time)
 
             eval_kwargs = {
                 "training_data": training_data,
@@ -270,29 +262,22 @@ def run_optimize(
                 "pool_training": False,
             }
 
-            start_time = time.time()
             # Evaluate each candidate solution
             if pool is None:
                 solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
             else:
                 jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]
-            print("Evaluations took", time.time() - start_time)
 
             # Tell es what the result was. It uses this to update its parameters
-            start_time = time.time()
             es.tell(solutions, solutions_fitness)
-            print("Tell took", time.time() - start_time)
 
             # Record winner for plotting and the future
-            start_time = time.time()
             if np.min(solutions_fitness) < bestever_score:
                 bestever_score = np.min(solutions_fitness)
                 bestever_weights = solutions[np.argmin(solutions_fitness)]
-            print("Bestever took", time.time() - start_time)
 
             # Plotting and visualization starts here
-            start_time = time.time()
             visualize_this_gen = args.visualize and g % config.logging.visualize_interval == 0
             if g % config.logging.plotting_interval == 0 or visualize_this_gen:
                 winner_flat = solutions[np.argmin(solutions_fitness)]
@@ -326,18 +311,16 @@ def run_optimize(
                         loss_test_size,
                         bestever_score,
                     )
-            # Plotting and visualization ends here
-            print("Plotting took", time.time() - start_time)
 
-            start_time = time.time()
+                print("Accuries are train:", acc_train_size, "Test:", acc_test_size, flush=True)
+            # Plotting and visualization ends here
+
             # Do we need to save a little bit of data?
             if save and g % config.logging.saving_interval == 0:
                 current_best_weights = solutions[np.argmin(solutions_fitness)]
                 logger_object.save_checkpoint(current_best_weights, filename="best_network")
                 logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
                 logger_object.save_plotting_data()
-
-            print("Saving took", time.time() - start_time)
 
             # Display results
             print("Current best score:", np.min(solutions_fitness), flush=True)
@@ -450,7 +433,7 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc = evaluate_nca_batch(
+    loss, acc, conf = evaluate_nca_batch(
         winner_flat,
         training_data,
         target_data,
@@ -467,3 +450,5 @@ if __name__ == "__main__":
     )
 
     print("Winner had a loss of", loss, "and an accuracy of", acc, "on test data")
+    print("Confusion matrix:")
+    print(conf)
