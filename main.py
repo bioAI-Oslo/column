@@ -62,41 +62,43 @@ def evaluate_nca_batch(
     silenced=0,
 ):
     """
-    Network creation time: 0.015133857727050781 # Amounts to 225 seconds extra across 15000 gens
-    Scale loss time: 7.152557373046875e-07
-    Reshape time: 1.1920928955078125e-06 # Amounts to 1.5 seconds extra across 15000 gens
-    Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
-    Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
+    Network creation took 0.10552453994750977
+    Reshape took 1.1682510375976562e-05 # Amounts to 1.5 seconds extra across 15000 gens
+    Reset took 0.04755043983459473 # Amounts to 11 minutes extra across 15000 gens
+    Classify took 0.29085350036621094 # Amounts to 1.2 hours extra across 15000 gens
+    Loss took 0.0036323070526123047 # Amounts to 54 seconds extra across 15000 gens
+    Predict took 7.152557373046875e-07
+    Eval took 0.44785308837890625 # Amounts to 1.99 hours across 15000 gens
     """
 
     assert pool_training is False, "Batch currently does not support pool training"
     assert visualize is False, "Batch currently does not support visualizing"
     assert silenced == 0, "Batch currently does not support silencing"
 
-    start_time_eval = time.time()
+    # start_time_eval = time.time()
 
-    start_time = time.time()
+    # start_time = time.time()
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
-    print("Network creation took", time.time() - start_time)
+    # print("Network creation took", time.time() - start_time)
 
     B, N, M = training_data.shape
 
-    start_time = time.time()
+    # start_time = time.time()
     images_raw = training_data.reshape(B, N, M, 1)
-    print("Reshape took", time.time() - start_time)
+    # print("Reshape took", time.time() - start_time)
 
-    start_time = time.time()
+    # start_time = time.time()
     network.reset_batched(B)
-    print("Reset took", time.time() - start_time)
-    start_time = time.time()
+    # print("Reset took", time.time() - start_time)
+    # start_time = time.time()
     class_predictions, _ = network.classify_batch(images_raw, visualize=False)
-    print("Classify took", time.time() - start_time)
+    # print("Classify took", time.time() - start_time)
 
-    start_time = time.time()
+    # start_time = time.time()
     loss = loss_function(class_predictions, None, target_data)
-    print("Loss took", time.time() - start_time)
+    # print("Loss took", time.time() - start_time)
 
-    start_time = time.time()
+    # start_time = time.time()
     if return_accuracy:
         beliefs = predicting_method(class_predictions)
         accuracy = np.sum(beliefs == np.argmax(target_data, axis=-1))
@@ -104,9 +106,9 @@ def evaluate_nca_batch(
 
         if verbose:
             print("Accuracy:", np.round(accuracy * 100 / B, 2), "%")
-    print("Predict took", time.time() - start_time)
+    # print("Predict took", time.time() - start_time)
 
-    print("Eval took", time.time() - start_time_eval)
+    # print("Eval took", time.time() - start_time_eval)
     if return_accuracy:
         return loss, accuracy
     return loss
@@ -136,7 +138,7 @@ def evaluate_nca(
     Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
     Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
     """
-    start_time_eval = time.time()
+    # start_time_eval = time.time()
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     loss = 0
@@ -147,11 +149,11 @@ def evaluate_nca(
             network.reset()
 
         # Code further on requires a 3D image. TODO See if this is necessary
-        start_time = time.time()
+        # start_time = time.time()
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
         # print("Reshape time:", time.time() - start_time)
 
-        start_time = time.time()
+        # start_time = time.time()
         class_predictions, guesses = network.classify(
             img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
         )
@@ -160,7 +162,7 @@ def evaluate_nca(
         if visualize and (visualized < args.vis_num):
             visualized += 1
 
-        start_time = time.time()
+        # start_time = time.time()
         loss += loss_function(class_predictions, guesses, expected)
         # print("Loss time:", time.time() - start_time)
 
@@ -176,7 +178,7 @@ def evaluate_nca(
         print("Accuracy:", np.round(accuracy * 100 / training_data.shape[0], 2), "%")
 
     scaled_loss = scale_loss(loss, training_data.shape[0])
-    print("Eval took", time.time() - start_time_eval)
+    # print("Eval took", time.time() - start_time_eval)
     if return_accuracy:
         return scaled_loss, float(accuracy) / float(training_data.shape[0])
     return scaled_loss
@@ -245,10 +247,14 @@ def run_optimize(
             print("Generation", g, flush=True)
 
             # Get candidate solutions based on CMA-ES internal parameters
+            start_time = time.time()
             solutions = es.ask(number=config.training.popsize)  # , sigma_fac=(((MAXGEN-g)/MAXGEN)*0.9)+0.1)
+            print("Solutions took", time.time() - start_time)
 
             # Generate training data for evaluating each candidate solution
+            start_time = time.time()
             training_data, target_data = data_func(**data_kwargs)
+            print("Training data took", time.time() - start_time)
 
             eval_kwargs = {
                 "training_data": training_data,
@@ -264,22 +270,29 @@ def run_optimize(
                 "pool_training": False,
             }
 
+            start_time = time.time()
             # Evaluate each candidate solution
             if pool is None:
                 solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
             else:
                 jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]
+            print("Evaluations took", time.time() - start_time)
 
             # Tell es what the result was. It uses this to update its parameters
+            start_time = time.time()
             es.tell(solutions, solutions_fitness)
+            print("Tell took", time.time() - start_time)
 
             # Record winner for plotting and the future
+            start_time = time.time()
             if np.min(solutions_fitness) < bestever_score:
                 bestever_score = np.min(solutions_fitness)
                 bestever_weights = solutions[np.argmin(solutions_fitness)]
+            print("Bestever took", time.time() - start_time)
 
             # Plotting and visualization starts here
+            start_time = time.time()
             visualize_this_gen = args.visualize and g % config.logging.visualize_interval == 0
             if g % config.logging.plotting_interval == 0 or visualize_this_gen:
                 winner_flat = solutions[np.argmin(solutions_fitness)]
@@ -314,13 +327,17 @@ def run_optimize(
                         bestever_score,
                     )
             # Plotting and visualization ends here
+            print("Plotting took", time.time() - start_time)
 
+            start_time = time.time()
             # Do we need to save a little bit of data?
             if save and g % config.logging.saving_interval == 0:
                 current_best_weights = solutions[np.argmin(solutions_fitness)]
                 logger_object.save_checkpoint(current_best_weights, filename="best_network")
                 logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
                 logger_object.save_plotting_data()
+
+            print("Saving took", time.time() - start_time)
 
             # Display results
             print("Current best score:", np.min(solutions_fitness), flush=True)
