@@ -21,7 +21,7 @@ from src.mnist_processing import get_MNIST_data
 from src.utils import get_config, translate
 from tqdm import tqdm
 
-path = "experiments/31-1-24_19:43"
+path = "experiments/8-2-24_11:4"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 
@@ -48,8 +48,9 @@ moving_nca_kwargs = {
     "size_image": (new_length, new_length),
     "num_classes": len(mnist_digits),
     "num_hidden": config.network.hidden_channels,
+    "hidden_neurons": config.network.hidden_neurons,
     "iterations": config.network.iterations,
-    "current_pos": config.network.current_pos,
+    "position": config.network.position,
     "moving": config.network.moving,
     "mnist_digits": mnist_digits,
 }

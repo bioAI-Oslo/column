@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-from src.mnist_processing import get_MNIST_data, get_MNIST_data_resized
+from src.mnist_processing import (
+    get_MNIST_data,
+    get_MNIST_data_padded,
+    get_MNIST_data_resized,
+)
 from src.utils import get_weights_info
 from tensorflow.keras import optimizers
 from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
@@ -114,17 +118,13 @@ def main():
     train_batches = 200
 
     # Data
-    data_func = get_MNIST_data
+    data_func = get_MNIST_data_padded
     MNIST_DIGITS = (0, 1, 2)
     SAMPLES_PER_DIGIT = 5400
 
     # Script wide functions
     train_x, train_y = data_func(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=SAMPLES_PER_DIGIT, verbose=False)
     test_x, test_y = data_func(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=892, verbose=False, test=True)
-
-    diff_x, diff_y = 14, 14
-    train_x = np.pad(train_x, ((0, 0), (diff_x, diff_y), (diff_x, diff_y)), "constant")
-    test_x = np.pad(test_x, ((0, 0), (diff_x, diff_y), (diff_x, diff_y)), "constant")
 
     model = CNN()
     model.compile(

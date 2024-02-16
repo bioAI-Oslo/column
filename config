@@ -19,16 +19,16 @@ plotting_interval = 20
 visualize_interval = 70000
 
 [DATASET]
-mnist_digits = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-samples_per_digit = 20
+mnist_digits = (0, 1, 2, 3, 4)
+samples_per_digit = 10
 data_func = get_MNIST_data
 # Size only matters if data_func = get_MNIST_data_resized
-size = 28
+size = 56
 
 [NETWORK]
-hidden_channels = 3
-hidden_neurons = 20
+hidden_channels = 4
+hidden_neurons = 10
 img_channels = 1
-iterations = 50
+iterations = 10
 moving = True
-position = None
+position = current

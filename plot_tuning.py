@@ -62,15 +62,23 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
         for j in range(len(feature2_list)):
             if convergence[i][j] == []:
                 continue
-            mean = np.mean(convergence[i][j], axis=0)
-            std = np.std(convergence[i][j], axis=0)
+            max_length = np.inf
+            for line in convergence[i][j]:
+                if len(line) < max_length:
+                    max_length = len(line)
+            print(max_length)
+            shorter = []
+            for h in convergence[i][j]:
+                shorter.append(h[:max_length])
+            mean = np.mean(shorter, axis=0)
+            std = np.std(shorter, axis=0)
 
             color = cmap(count_plotted / count_lines)
 
-            plt.fill_between(x_axis[i][j][0], mean - std, mean + std, color=color, alpha=0.5)
+            plt.fill_between(x_axis[i][j][0][:max_length], mean - std, mean + std, color=color, alpha=0.5)
 
             plt.plot(
-                x_axis[i][j][0],
+                x_axis[i][j][0][:max_length],
                 mean,
                 label=str(feature1_list[i]) + " " + str(feature2_list[j]),
                 color=color,
@@ -83,6 +91,16 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
     plt.ylabel(ylabel)
     plt.xlabel("Generation")
     plt.legend()
+
+
+def mean_across_inhomogeneous_dimensions(input_array: list):
+    N, M = len(input_array), len(input_array[0])
+    means = np.zeros((N, M))
+    for x in range(N):
+        for y in range(M):
+            means[x, y] = np.mean(input_array[x][y])
+
+    return means
 
 
 ######################################## HEATMAP ##########################################
@@ -131,10 +149,10 @@ for x in range(len(feature1_list)):
                 hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Accuracy gets low value
 
 # Take mean
-heatmap_loss_train = np.mean(heatmap_loss_train, axis=2)
-heatmap_acc_train = np.mean(heatmap_acc_train, axis=2)
-heatmap_acc_test = np.mean(heatmap_acc_test, axis=2)
-heatmap_loss_test = np.mean(heatmap_loss_test, axis=2)
+heatmap_loss_train = mean_across_inhomogeneous_dimensions(heatmap_loss_train)
+heatmap_acc_train = mean_across_inhomogeneous_dimensions(heatmap_acc_train)
+heatmap_acc_test = mean_across_inhomogeneous_dimensions(heatmap_acc_test)
+heatmap_loss_test = mean_across_inhomogeneous_dimensions(heatmap_loss_test)
 
 # Plot heatmaps
 plt.figure()

@@ -35,13 +35,81 @@ warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
 warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
-deterministic = False
+deterministic = True
 if deterministic:
     import random
 
     np.random.seed(0)
     random.seed(0)
     tf.random.set_seed(0)
+
+
+# Evaluate one solution batched
+def evaluate_nca_batch(
+    flat_weights,
+    training_data,
+    target_data,
+    moving_nca_kwargs,
+    loss_function,
+    predicting_method,
+    verbose=False,
+    visualize=False,
+    N_neo=None,
+    M_neo=None,
+    return_accuracy=False,
+    pool_training=False,
+    return_confusion=False,
+    silenced=0,
+):
+    """
+    Network creation time: 0.015133857727050781 # Amounts to 225 seconds extra across 15000 gens
+    Scale loss time: 7.152557373046875e-07
+    Reshape time: 1.1920928955078125e-06 # Amounts to 1.5 seconds extra across 15000 gens
+    Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
+    Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
+    """
+
+    assert pool_training is False, "Batch currently does not support pool training"
+    assert visualize is False, "Batch currently does not support visualizing"
+    assert silenced == 0, "Batch currently does not support silencing"
+
+    start_time_eval = time.time()
+
+    start_time = time.time()
+    network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
+    print("Network creation took", time.time() - start_time)
+
+    B, N, M = training_data.shape
+
+    start_time = time.time()
+    images_raw = training_data.reshape(B, N, M, 1)
+    print("Reshape took", time.time() - start_time)
+
+    start_time = time.time()
+    network.reset_batched(B)
+    print("Reset took", time.time() - start_time)
+    start_time = time.time()
+    class_predictions, _ = network.classify_batch(images_raw, visualize=False)
+    print("Classify took", time.time() - start_time)
+
+    start_time = time.time()
+    loss = loss_function(class_predictions, None, target_data)
+    print("Loss took", time.time() - start_time)
+
+    start_time = time.time()
+    if return_accuracy:
+        beliefs = predicting_method(class_predictions)
+        accuracy = np.sum(beliefs == np.argmax(target_data, axis=-1))
+        accuracy /= B
+
+        if verbose:
+            print("Accuracy:", np.round(accuracy * 100 / B, 2), "%")
+    print("Predict took", time.time() - start_time)
+
+    print("Eval took", time.time() - start_time_eval)
+    if return_accuracy:
+        return loss, accuracy
+    return loss
 
 
 # Evaluate one solution
@@ -58,7 +126,17 @@ def evaluate_nca(
     M_neo=None,
     return_accuracy=False,
     pool_training=False,
+    return_confusion=False,
+    silenced=0,
 ):
+    """
+    Network creation time: 0.015133857727050781 # Amounts to 225 seconds extra across 15000 gens
+    Scale loss time: 7.152557373046875e-07
+    Reshape time: 1.1920928955078125e-06 # Amounts to 1.5 seconds extra across 15000 gens
+    Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
+    Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
+    """
+    start_time_eval = time.time()
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     loss = 0
@@ -69,14 +147,22 @@ def evaluate_nca(
             network.reset()
 
         # Code further on requires a 3D image. TODO See if this is necessary
+        start_time = time.time()
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
+        # print("Reshape time:", time.time() - start_time)
 
-        class_predictions, guesses = network.classify(img_raw, visualize=visualize and (visualized < args.vis_num))
+        start_time = time.time()
+        class_predictions, guesses = network.classify(
+            img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
+        )
+        # print("Classification time:", time.time() - start_time)
 
         if visualize and (visualized < args.vis_num):
             visualized += 1
 
+        start_time = time.time()
         loss += loss_function(class_predictions, guesses, expected)
+        # print("Loss time:", time.time() - start_time)
 
         if verbose or return_accuracy:
             belief = np.mean(class_predictions, axis=(0, 1))
@@ -90,6 +176,7 @@ def evaluate_nca(
         print("Accuracy:", np.round(accuracy * 100 / training_data.shape[0], 2), "%")
 
     scaled_loss = scale_loss(loss, training_data.shape[0])
+    print("Eval took", time.time() - start_time_eval)
     if return_accuracy:
         return scaled_loss, float(accuracy) / float(training_data.shape[0])
     return scaled_loss
@@ -179,9 +266,9 @@ def run_optimize(
 
             # Evaluate each candidate solution
             if pool is None:
-                solutions_fitness = [evaluate_nca(s, **eval_kwargs) for s in solutions]
+                solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
             else:
-                jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
+                jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]
 
             # Tell es what the result was. It uses this to update its parameters
@@ -207,13 +294,13 @@ def run_optimize(
                 eval_kwargs["return_accuracy"] = True
 
                 # We don't have to change the neo size because it's already train size
-                loss_train_size, acc_train_size = evaluate_nca(winner_flat, **eval_kwargs)
+                loss_train_size, acc_train_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
 
                 # Alter specific neo sizes for testing size
                 eval_kwargs["N_neo"] = config.scale.test_n_neo
                 eval_kwargs["M_neo"] = config.scale.test_m_neo
 
-                loss_test_size, acc_test_size = evaluate_nca(winner_flat, **eval_kwargs)
+                loss_test_size, acc_test_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
 
                 testing_data, target_data_test = None, None
 
@@ -346,18 +433,20 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc = evaluate_nca(
+    loss, acc = evaluate_nca_batch(
         winner_flat,
         training_data,
         target_data,
         moving_nca_kwargs,
         loss_function,
         predicting_method,
-        verbose=True,
+        verbose=False,
         visualize=args.visualize,
         return_accuracy=True,
         N_neo=config.scale.test_n_neo,
         M_neo=config.scale.test_m_neo,
+        return_confusion=True,
+        silenced=0,
     )
 
     print("Winner had a loss of", loss, "and an accuracy of", acc, "on test data")

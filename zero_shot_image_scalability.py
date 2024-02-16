@@ -24,7 +24,7 @@ from tqdm import tqdm
 
 sns.set()
 
-path = "experiments/tuning_size/3-2-24_17:28"
+path = "experiments/tuning_iter_and_sigma/29-1-24_11:41"
 config = get_config(path)
 winner_flat = Logger.load_checkpoint(path)
 
@@ -33,7 +33,7 @@ mnist_digits = eval(config.dataset.mnist_digits)
 data_func = get_MNIST_data
 kwargs = {
     "MNIST_DIGITS": mnist_digits,
-    "SAMPLES_PER_DIGIT": 10,
+    "SAMPLES_PER_DIGIT": 100,
     "verbose": False,
     "test": True,
 }
@@ -71,7 +71,7 @@ for size in tqdm(sizes):
             "num_hidden": config.network.hidden_channels,
             "hidden_neurons": config.network.hidden_neurons,
             "iterations": config.network.iterations,
-            "current_pos": config.network.current_pos,
+            "position": config.network.position,
             "moving": config.network.moving,
             "mnist_digits": mnist_digits,
         }
@@ -136,6 +136,8 @@ for i in range(2):
         color=cmap(0.5 * i + 3.5 / 5),
     )
 
+plt.yticks(np.arange(0, 1.2, 0.2), np.round(np.arange(0, 1.2, 0.2), 1))
+plt.xlabel("Size of image")
 plt.legend()
 
 plt.show()

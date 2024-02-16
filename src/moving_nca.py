@@ -1,5 +1,6 @@
 import copy
 import multiprocessing as mp
+import random
 import time
 
 import numpy as np
@@ -13,6 +14,9 @@ from src.utils import (
     get_weights_info,
 )
 from tensorflow.keras.layers import Conv2D, Dense, Input
+from tensorflow.python.framework.convert_to_constants import (
+    convert_variables_to_constants_v2,
+)
 
 
 class MovingNCA(tf.keras.Model):
@@ -64,7 +68,7 @@ class MovingNCA(tf.keras.Model):
         self.reset()
 
         # dummy calls to build the model
-        self.dmodel(tf.zeros([1, 3 * 3 * self.input_dim + self.position_addon]))
+        self.dmodel(tf.zeros([1, self.input_dim * 3 * 3 + self.position_addon]))
 
     def reset(self):
         """
@@ -77,6 +81,22 @@ class MovingNCA(tf.keras.Model):
         # The internal state of the artificial neocortex needs to be reset as well
         self.state = np.zeros((self.size_image[0], self.size_image[1], self.input_dim - self.img_channels))
 
+    def reset_batched(self, batch_size):
+        self.dmodel.reset_states()
+        self.perceptions_batched = []
+
+        for _ in range(batch_size):
+            self.perceptions_batched.append(
+                get_perception_matrix(
+                    self.size_image[0] - 2, self.size_image[1] - 2, self.size_neo[0], self.size_neo[1]
+                )
+            )
+        self.perceptions_batched = np.array(self.perceptions_batched)
+
+        self.state_batched = np.zeros(
+            (batch_size, self.size_image[0], self.size_image[1], self.input_dim - self.img_channels)
+        )
+
     # @tf.function
     def call(self, img, visualize=False):
         return self.classify(img, visualize)
@@ -86,7 +106,44 @@ class MovingNCA(tf.keras.Model):
 
         return NotImplementedError()
 
-    def classify(self, img_raw, visualize=False):
+    def classify_batch(self, images_raw, visualize=False):
+        B = len(images_raw)
+        N_neo, M_neo = self.size_neo
+        N_active, M_active = self._size_active
+
+        guesses = None
+        for _ in range(self.iterations):
+            input = np.empty((B * N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
+            # start_time = time.time()
+            collect_input_batched(
+                input, images_raw, self.state_batched, self.perceptions_batched, self.position, N_neo, M_neo
+            )
+            # print("Collecting took", time.time() - start_time)
+            # start_time = time.time()
+            guesses = self.dmodel(input)
+            # print("Call took", time.time() - start_time)
+            guesses = guesses.numpy()
+            # start_time = time.time()
+            outputs = np.reshape(guesses[:, :], (B, N_neo, M_neo, self.output_dim))
+            # print("Reshape took", time.time() - start_time)
+
+            # start_time = time.time()
+            self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
+                self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, :]
+                + outputs[:, :, :, : self.input_dim - self.img_channels]
+            )
+            # print("State took", time.time() - start_time)
+
+            start_time = time.time()
+            if self.moving:
+                alter_perception_slicing_batched(
+                    self.perceptions_batched, outputs[:, :, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
+                )
+            # print("Slicing took", time.time() - start_time)
+
+        return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
+
+    def classify(self, img_raw, visualize=False, silenced=0):
         """
         Classify the input image using the trained model.
 
@@ -108,24 +165,63 @@ class MovingNCA(tf.keras.Model):
         N_neo, M_neo = self.size_neo
         N_active, M_active = self._size_active
 
+        if silenced > 0:
+            x = np.random.randint(N_neo)
+            y = np.random.randint(M_neo)
+
+            radius = silenced
+            random_x, random_y = [], []
+            for i in range(N_neo):
+                for j in range(M_neo):
+                    if np.sqrt((i - x) ** 2 + (j - y) ** 2) < radius:
+                        random_x.append(i)
+                        random_y.append(j)
+
+            random_x = np.array(random_x) + 1
+            random_y = np.array(random_y) + 1
+
+            """x, y = np.meshgrid(list(range(N_neo)), list(range(M_neo)))
+            xy = [x.ravel(), y.ravel()]
+            indices = np.array(xy).T
+
+            random_indices = np.random.choice(range(len(indices)), size=silenced, replace=False)
+
+            random_x, random_y = indices[random_indices].T + 1"""
+
         guesses = None
         for _ in range(self.iterations):
+            start_time = time.time()
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
+            # print("Preprocessing time:", time.time() - start_time)
+            start_time = time.time()
             collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo)
+            # print("Input collection time:", time.time() - start_time)
 
+            start_time = time.time()
+            # guesses = tf.stop_gradient(self.dmodel(input)) # This doesn't make a difference
             guesses = self.dmodel(input)
+            # print("Model call time:", time.time() - start_time)
+            start_time = time.time()
             guesses = guesses.numpy()
+            # print("Postprocessing time:", time.time() - start_time)
 
+            start_time = time.time()
             outputs = np.reshape(guesses[:, :], (N_neo, M_neo, self.output_dim))
+            # print("Reshaping time:", time.time() - start_time)
 
             self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] + outputs[:, :, : self.input_dim - self.img_channels]
             )
 
+            if silenced > 0:
+                self.state[random_x, random_y, :] = 0
+
             if self.moving:
+                start_time = time.time()
                 alter_perception_slicing(
                     self.perceptions, outputs[:, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
+                # print("Slicing time:", time.time() - start_time)
 
             if visualize:
                 img = add_channels_single_preexisting(img_raw, self.state)
@@ -236,6 +332,28 @@ def alter_perception_slicing(perceptions, actions, N_neo, M_neo, N_active, M_act
 
 
 @jit
+def clipping_batched(array, N, M):
+    # This function clips the values in the array to the range [0, N]
+    # It alters the array in place
+    B, N_neo, M_neo, _ = array.shape
+    for b in range(B):
+        for x in range(N_neo):
+            for y in range(M_neo):
+                array[b, x, y, 0] = min(max(array[b, x, y, 0], 0), N)
+                array[b, x, y, 1] = min(max(array[b, x, y, 1], 0), M)
+
+
+def add_action_slicing_batched(perceptions_batched: list, actions_batched: list, N: int, M: int) -> np.ndarray:
+    perceptions_batched += custom_round_slicing(actions_batched)
+    assert N == M, "The code currently does not support N != M"
+    clipping_batched(perceptions_batched, N - 1, M - 1)  # Changes array in place
+
+
+def alter_perception_slicing_batched(perceptions_batched, actions_batched, N_neo, M_neo, N_active, M_active):
+    add_action_slicing_batched(perceptions_batched, actions_batched, N_active, M_active)
+
+
+@jit
 def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
     N, M, _ = state.shape
     for x in range(N_neo):
@@ -256,8 +374,72 @@ def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
                 input[x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
 
 
+@jit
+def collect_input_batched(input, images, state_batched, perceptions_batched, position, N_neo, M_neo):
+    B, N, M, _ = images.shape
+
+    for x in range(N_neo):
+        for y in range(M_neo):
+            for b in range(B):
+                x_p, y_p = perceptions_batched[b, x, y].T
+                perc = images[b, x_p : x_p + 3, y_p : y_p + 3, :]
+                comms = state_batched[b, x : x + 3, y : y + 3, :]
+
+                dummy = np.concatenate((perc, comms), axis=-1)
+                dummy_flat = dummy.flatten()
+                input[b * N_neo * M_neo + x * M_neo + y, : len(dummy_flat)] = dummy_flat
+
+                # When position is None, the input is just the perception and comms
+                if position == "current":
+                    input[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
+                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
+                elif position == "initial":
+                    input[b * N_neo * M_neo + x * M_neo + y, -2] = (float(x) * N / float(N_neo) - N // 2) / (N // 2)
+                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
+
+    """for i in range(B):
+        input_inner = np.empty((N_neo * M_neo, input.shape[1]))
+        collect_input(
+            input_inner,
+            images[i],
+            state_batched[i],
+            perceptions_batched[i],
+            position,
+            N_neo,
+            M_neo,
+        )
+        input[i * N_neo * M_neo : (i + 1) * N_neo * M_neo] = input_inner"""
+
+
 def get_dimensions(data_shape, N_neo, M_neo):
     N, M = data_shape
     N_neo = N - 2 if N_neo is None else N_neo
     M_neo = M - 2 if M_neo is None else M_neo
     return N_neo, M_neo
+
+
+@jit
+def expand(arr):
+    B, N, M, _ = arr.shape
+    expanded_arr = np.zeros((B, N * 3, M * 3, 2), dtype=np.int32)
+    x_p, y_p = arr[:, :, :, 0], arr[:, :, :, 1]
+
+    for i in range(3):
+        for j in range(3):
+            expanded_arr[:, i::3, j::3, 0] = x_p + i
+            expanded_arr[:, i::3, j::3, 1] = y_p + j
+
+    return expanded_arr  # Fucking "in16" is not supported...
+
+
+@jit
+def gather_mine(arr, movement_expanded):
+    B, N_neo, M_neo, _ = movement_expanded.shape
+    new_arr = np.empty((B, N_neo, M_neo, arr.shape[-1]), dtype=arr.dtype)
+
+    for b in range(B):
+        for x in range(N_neo):
+            for y in range(M_neo):
+                new_arr[b, x, y, :] = arr[b, movement_expanded[b, x, y, 0], movement_expanded[b, x, y, 1], :]
+
+    return new_arr
