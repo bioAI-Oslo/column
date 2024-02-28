@@ -1,6 +1,5 @@
 import copy
 import multiprocessing as mp
-import random
 import time
 
 import numpy as np
@@ -14,9 +13,6 @@ from src.utils import (
     get_weights_info,
 )
 from tensorflow.keras.layers import Conv2D, Dense, Input
-from tensorflow.python.framework.convert_to_constants import (
-    convert_variables_to_constants_v2,
-)
 
 
 class MovingNCA(tf.keras.Model):
@@ -36,8 +32,9 @@ class MovingNCA(tf.keras.Model):
 
         if size_image is None:
             size_image = (28, 28)
-        self.size_neo = get_dimensions(size_image, size_neo[0], size_neo[1])
         self.size_image = size_image
+
+        self.size_neo = get_dimensions(size_image, size_neo)
         self._size_active = (size_image[0] - 2, size_image[1] - 2)
 
         self.img_channels = 1
@@ -48,8 +45,16 @@ class MovingNCA(tf.keras.Model):
         self.output_dim = self.num_hidden + self.num_classes + self.act_channels
         self.iterations = iterations
         self.moving = moving
+
+        # For unknown reasons, this line takes forever
+        """start_time = time.time()
+        self.position = "Hi"
+        print("Position:", type(position), time.time() - start_time)"""
+
         self.position = position
-        self.position_addon = 0 if self.position == None else 2
+        # print("Position:", type(position), time.time() - start_time)
+
+        self.position_addon = 0 if self.position == "None" else 2
 
         self.mnist_digits = mnist_digits
 
@@ -64,8 +69,6 @@ class MovingNCA(tf.keras.Model):
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
         )
-
-        self.reset()
 
         # dummy calls to build the model
         self.dmodel(tf.zeros([1, self.input_dim * 3 * 3 + self.position_addon]))
@@ -82,7 +85,13 @@ class MovingNCA(tf.keras.Model):
         self.state = np.zeros((self.size_image[0], self.size_image[1], self.input_dim - self.img_channels))
 
     def reset_batched(self, batch_size):
-        self.dmodel.reset_states()
+        """
+        Resets the state by resetting the dmodel layers, the state and the perception matrix
+        But batched.
+        """
+        self.dmodel.reset_states()  # Reset the state if any dmodel.layers is stateful. If not, does nothing.
+
+        # Resetting, or setting, perception matrix (batched version)
         self.perceptions_batched = []
 
         for _ in range(batch_size):
@@ -93,6 +102,7 @@ class MovingNCA(tf.keras.Model):
             )
         self.perceptions_batched = np.array(self.perceptions_batched)
 
+        # The internal state of the artificial neocortex needs to be reset as well
         self.state_batched = np.zeros(
             (batch_size, self.size_image[0], self.size_image[1], self.input_dim - self.img_channels)
         )
@@ -107,40 +117,51 @@ class MovingNCA(tf.keras.Model):
         return NotImplementedError()
 
     def classify_batch(self, images_raw, visualize=False):
+        """
+        Classify a batch of images using the networks perception and state, and update the state and perception accordingly.
+        This function alters the object's state and perception (batched).
+        If you wish to reset the state and perception, remember to call reset_batched().
+
+        Args:
+            images_raw: The raw input images
+            visualize: Not supported, kept for ease of coding
+
+        Returns:
+            A tuple containing the updated state_batched and the guesses
+        """
         B = len(images_raw)
         N_neo, M_neo = self.size_neo
         N_active, M_active = self._size_active
 
         guesses = None
         for _ in range(self.iterations):
+            # The input vector is the perception and state
             input = np.empty((B * N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
-            # start_time = time.time()
+            # This function alters "input" in place
             collect_input_batched(
                 input, images_raw, self.state_batched, self.perceptions_batched, self.position, N_neo, M_neo
             )
-            # print("Collecting took", time.time() - start_time)
-            # start_time = time.time()
-            guesses = self.dmodel(input)
-            # print("Call took", time.time() - start_time)
-            guesses = guesses.numpy()
-            # start_time = time.time()
-            outputs = np.reshape(guesses[:, :], (B, N_neo, M_neo, self.output_dim))
-            # print("Reshape took", time.time() - start_time)
 
-            # start_time = time.time()
+            # The output "guesses" are the state and movement
+            guesses = self.dmodel(input)
+            guesses = guesses.numpy()
+
+            # Reshape back into network shape
+            outputs = np.reshape(guesses[:, :], (B, N_neo, M_neo, self.output_dim))
+
+            # Update the state
             self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, :]
                 + outputs[:, :, :, : self.input_dim - self.img_channels]
             )
-            # print("State took", time.time() - start_time)
 
-            start_time = time.time()
+            # Update the perception
             if self.moving:
                 alter_perception_slicing_batched(
                     self.perceptions_batched, outputs[:, :, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
-            # print("Slicing took", time.time() - start_time)
 
+        # I should really phase out having guesses here, I don't use it for anything... TODO
         return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
     def classify(self, img_raw, visualize=False, silenced=0):
@@ -190,24 +211,14 @@ class MovingNCA(tf.keras.Model):
 
         guesses = None
         for _ in range(self.iterations):
-            start_time = time.time()
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
-            # print("Preprocessing time:", time.time() - start_time)
-            start_time = time.time()
             collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo)
-            # print("Input collection time:", time.time() - start_time)
 
-            start_time = time.time()
             # guesses = tf.stop_gradient(self.dmodel(input)) # This doesn't make a difference
             guesses = self.dmodel(input)
-            # print("Model call time:", time.time() - start_time)
-            start_time = time.time()
             guesses = guesses.numpy()
-            # print("Postprocessing time:", time.time() - start_time)
 
-            start_time = time.time()
             outputs = np.reshape(guesses[:, :], (N_neo, M_neo, self.output_dim))
-            # print("Reshaping time:", time.time() - start_time)
 
             self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] + outputs[:, :, : self.input_dim - self.img_channels]
@@ -217,11 +228,9 @@ class MovingNCA(tf.keras.Model):
                 self.state[random_x, random_y, :] = 0
 
             if self.moving:
-                start_time = time.time()
                 alter_perception_slicing(
                     self.perceptions, outputs[:, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
-                # print("Slicing time:", time.time() - start_time)
 
             if visualize:
                 img = add_channels_single_preexisting(img_raw, self.state)
@@ -274,6 +283,7 @@ class MovingNCA(tf.keras.Model):
             moving=moving,
             mnist_digits=mnist_digits,
         )
+
         network.set_weights(flat_weights)
         return network
 
@@ -287,6 +297,7 @@ class MovingNCA(tf.keras.Model):
 
 def custom_round_slicing(x: list):
     """
+    Works for batches.
     Rounds the values in the input list by applying slicing.
     Negative values are rounded down to -1, positive values are rounded
     up to 1, and zero values are rounded to 0.
@@ -397,6 +408,8 @@ def collect_input_batched(input, images, state_batched, perceptions_batched, pos
                     input[b * N_neo * M_neo + x * M_neo + y, -2] = (float(x) * N / float(N_neo) - N // 2) / (N // 2)
                     input[b * N_neo * M_neo + x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
 
+    # Below is the old version, almost as fast, but not quite.
+    # If something is wrong with the new version, I trust this version to be correct
     """for i in range(B):
         input_inner = np.empty((N_neo * M_neo, input.shape[1]))
         collect_input(
@@ -411,14 +424,16 @@ def collect_input_batched(input, images, state_batched, perceptions_batched, pos
         input[i * N_neo * M_neo : (i + 1) * N_neo * M_neo] = input_inner"""
 
 
-def get_dimensions(data_shape, N_neo, M_neo):
+def get_dimensions(data_shape, neo_shape):
     N, M = data_shape
-    N_neo = N - 2 if N_neo is None else N_neo
-    M_neo = M - 2 if M_neo is None else M_neo
+    N_neo = N - 2 if neo_shape is None else neo_shape[0]
+    M_neo = M - 2 if neo_shape is None else neo_shape[1]
     return N_neo, M_neo
 
 
-@jit
+### The functions below are not really used.
+
+
 def expand(arr):
     B, N, M, _ = arr.shape
     expanded_arr = np.zeros((B, N * 3, M * 3, 2), dtype=np.int32)
@@ -432,7 +447,6 @@ def expand(arr):
     return expanded_arr  # Fucking "in16" is not supported...
 
 
-@jit
 def gather_mine(arr, movement_expanded):
     B, N_neo, M_neo, _ = movement_expanded.shape
     new_arr = np.empty((B, N_neo, M_neo, arr.shape[-1]), dtype=arr.dtype)

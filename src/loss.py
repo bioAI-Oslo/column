@@ -10,8 +10,18 @@ def pixel_wise_CE_and_energy(img, guesses, expected):
 
 
 def energy(img, guesses, expected):
+    N, M = img.shape[-3:-1]
+    regulator = 225 / (N * M) * 0.0001  # Any size of cortex will yield the equivalent of 0.0001 for a 15*15 cortex
+
     # Batch approved
-    return np.sum(img**2) * 0.0001
+    if len(img.shape) == 4:
+        B = img.shape[0]
+        return (np.sum(img**2) * regulator) / B
+    elif len(img.shape) == 3:
+        # We scale outside because the batch size is currently unknown
+        return np.sum(img**2) * regulator
+    else:
+        print("oopsie")
 
 
 def pixel_wise_L2_and_CE(img, guesses, expected):
@@ -52,6 +62,15 @@ def pixel_wise_CE(img, guesses, expected):
             expected, predicted
         )
     )
+    """B, N, M, O = img.shape
+    loss = 0
+    for b in range(B):
+        loss += float(
+            tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.AUTO)(
+                expected[b * N * M : (b + 1) * N * M], predicted[b * N * M : (b + 1) * N * M]
+            )
+        )
+    return loss / len(img)"""
 
 
 def global_mean_medians(img, guesses, expected):

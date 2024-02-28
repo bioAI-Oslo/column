@@ -13,6 +13,7 @@ from localconfig import config
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from src.logger import Logger
 from src.loss import (
+    energy,
     global_mean_medians,
     highest_value,
     highest_vote,
@@ -35,6 +36,7 @@ warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
 warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
+# This is just for testing the code
 deterministic = False
 if deterministic:
     import random
@@ -75,16 +77,21 @@ def evaluate_nca_batch(
     assert visualize is False, "Batch currently does not support visualizing"
     assert silenced == 0, "Batch currently does not support silencing"
 
+    # Getting network
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
+    # Reshaping images
     B, N, M = training_data.shape
     images_raw = training_data.reshape(B, N, M, 1)
 
+    # Reset network and get classifications
     network.reset_batched(B)
     class_predictions, _ = network.classify_batch(images_raw, visualize=False)
 
+    # Get loss
     loss = loss_function(class_predictions, None, target_data)
 
+    # Calculate and return accuracy if wanted
     if return_accuracy:
         beliefs = predicting_method(class_predictions)
         accuracy = np.sum(beliefs == np.argmax(target_data, axis=-1))
@@ -93,6 +100,7 @@ def evaluate_nca_batch(
         if verbose:
             print("Accuracy:", np.round(accuracy * 100 / B, 2), "%")
 
+    # Calculate and return confusion matrix if wanted
     if return_confusion:
         beliefs = predicting_method(class_predictions)
         confusion = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.int32)
@@ -134,12 +142,16 @@ def evaluate_nca(
     """
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
+    assert pool_training == False, "Currently does not support pool training"
+
+    if return_confusion:
+        conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.int32)
+
     loss = 0
     accuracy = 0
     visualized = 0
     for sample, (img_raw, expected) in enumerate(zip(training_data, target_data)):
-        if not pool_training or (pool_training and sample != 0 and sample % 2 == 0):
-            network.reset()
+        network.reset()
 
         # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
@@ -161,10 +173,17 @@ def evaluate_nca(
             if verbose:
                 print("Expected", expected, "got", belief)
 
+            if return_confusion:
+                conf_matrix[actual, believed] += 1
+
     if verbose:
         print("Accuracy:", np.round(accuracy * 100 / training_data.shape[0], 2), "%")
 
     scaled_loss = scale_loss(loss, training_data.shape[0])
+    if return_confusion:
+        if return_accuracy:
+            return scaled_loss, float(accuracy) / float(training_data.shape[0]), conf_matrix
+        return scaled_loss, conf_matrix
     if return_accuracy:
         return scaled_loss, float(accuracy) / float(training_data.shape[0])
     return scaled_loss
@@ -390,7 +409,7 @@ if __name__ == "__main__":
         "num_hidden": config.network.hidden_channels,
         "hidden_neurons": config.network.hidden_neurons,
         "iterations": config.network.iterations,
-        "position": config.network.position,
+        "position": str(config.network.position),
         "moving": config.network.moving,
         "mnist_digits": mnist_digits,
     }
