@@ -11,6 +11,7 @@ from localconfig import config
 # Suppressing deprecation warnings from numba because it floods
 # the error logs files.
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+from src.cifar_processing import get_CIFAR_data
 from src.logger import Logger
 from src.loss import (
     energy,
@@ -98,7 +99,7 @@ def evaluate_nca_batch(
         accuracy /= B
 
         if verbose:
-            print("Accuracy:", np.round(accuracy * 100 / B, 2), "%")
+            print("Accuracy:", np.round(accuracy * 100, 2), "%")
 
     # Calculate and return confusion matrix if wanted
     if return_confusion:
@@ -140,9 +141,10 @@ def evaluate_nca(
     Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
     Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
     """
-    network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     assert pool_training == False, "Currently does not support pool training"
+
+    network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     if return_confusion:
         conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.int32)
@@ -431,6 +433,8 @@ if __name__ == "__main__":
     elif config.dataset.data_func == "get_MNIST_data_padded":
         # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
         moving_nca_kwargs["size_image"] = (56, 56)
+    elif config.dataset.data_func == "get_CIFAR_data":
+        moving_nca_kwargs["size_image"] = (32, 32)
 
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
