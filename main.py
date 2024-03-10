@@ -29,6 +29,7 @@ from src.mnist_processing import (
     get_MNIST_data_padded,
     get_MNIST_data_resized,
     get_MNIST_data_translated,
+    get_MNIST_fashion_data,
 )
 from src.moving_nca import MovingNCA
 from src.utils import get_weights_info
@@ -456,7 +457,7 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc, conf = evaluate_nca_batch(
+    loss, acc, conf = evaluate_nca(
         winner_flat,
         training_data,
         target_data,
@@ -474,4 +475,13 @@ if __name__ == "__main__":
 
     print("Winner had a loss of", loss, "and an accuracy of", acc, "on test data")
     print("Confusion matrix:")
-    print(conf)
+    if args.visualize:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        sns.heatmap(conf / (kwargs["SAMPLES_PER_DIGIT"]), annot=True, cmap="plasma")
+        plt.ylabel("Real")
+        plt.xlabel("Predicted")
+        plt.show()
+    else:
+        print(conf)

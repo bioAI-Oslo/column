@@ -4,7 +4,7 @@ import time
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.datasets import mnist
+from keras.datasets import fashion_mnist, mnist
 from src.utils import translate
 
 
@@ -49,7 +49,11 @@ def get_MNIST_data_translated(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose
     return training_data, target_data
 
 
-def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False):
+def get_MNIST_fashion_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False):
+    return get_MNIST_data(MNIST_DIGITS, SAMPLES_PER_DIGIT, verbose, test, fashion=True)
+
+
+def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False, fashion=False):
     global sorted_X_train
     global sorted_X_test
     if verbose:
@@ -57,11 +61,11 @@ def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, tes
     if not test and sorted_X_train is None:
         if verbose:
             print("Initializing MNIST training data")
-        sorted_X_train = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=False)
+        sorted_X_train = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=False, fashion=fashion)
     elif test and sorted_X_test is None:
         if verbose:
             print("Initializing MNIST test data")
-        sorted_X_test = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=True)
+        sorted_X_test = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=True, fashion=fashion)
 
     sorted_X = sorted_X_train if not test else sorted_X_test
 
@@ -86,9 +90,12 @@ def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, tes
     return training_data, target_data
 
 
-def initalize_MNIST_reduced_digits(MNIST_DIGITS=(3, 4), test=False):
+def initalize_MNIST_reduced_digits(MNIST_DIGITS=(3, 4), test=False, fashion=False):
     # Loading
-    (train_X, train_y), (test_X, test_y) = mnist.load_data()
+    if fashion:
+        (train_X, train_y), (test_X, test_y) = fashion_mnist.load_data()
+    else:
+        (train_X, train_y), (test_X, test_y) = mnist.load_data()
     x = train_X if not test else test_X
     y = train_y if not test else test_y
 
