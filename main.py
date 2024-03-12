@@ -143,7 +143,7 @@ def evaluate_nca(
     Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
     """
 
-    assert pool_training == False, "Currently does not support pool training"
+    # assert pool_training == False, "Currently does not support pool training"
 
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
@@ -154,7 +154,8 @@ def evaluate_nca(
     accuracy = 0
     visualized = 0
     for sample, (img_raw, expected) in enumerate(zip(training_data, target_data)):
-        network.reset()
+        if not pool_training or sample % 2 == 0:
+            network.reset()
 
         # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
@@ -281,14 +282,14 @@ def run_optimize(
                 "N_neo": config.scale.train_n_neo,
                 "M_neo": config.scale.train_m_neo,
                 "return_accuracy": False,
-                "pool_training": False,
+                "pool_training": config.training.pool_training,
             }
 
             # Evaluate each candidate solution
             if pool is None:
-                solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
+                solutions_fitness = [evaluate_nca(s, **eval_kwargs) for s in solutions]
             else:
-                jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
+                jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]
 
             # Tell es what the result was. It uses this to update its parameters
@@ -314,13 +315,13 @@ def run_optimize(
                 eval_kwargs["return_accuracy"] = True
 
                 # We don't have to change the neo size because it's already train size
-                loss_train_size, acc_train_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_train_size, acc_train_size = evaluate_nca(winner_flat, **eval_kwargs)
 
                 # Alter specific neo sizes for testing size
                 eval_kwargs["N_neo"] = config.scale.test_n_neo
                 eval_kwargs["M_neo"] = config.scale.test_m_neo
 
-                loss_test_size, acc_test_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_test_size, acc_test_size = evaluate_nca(winner_flat, **eval_kwargs)
 
                 testing_data, target_data_test = None, None
 
@@ -471,6 +472,7 @@ if __name__ == "__main__":
         M_neo=config.scale.test_m_neo,
         return_confusion=True,
         silenced=0,
+        pool_training=config.training.pool_training,
     )
 
     print("Winner had a loss of", loss, "and an accuracy of", acc, "on test data")
