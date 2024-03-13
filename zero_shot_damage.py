@@ -30,16 +30,28 @@ NUM_DATA = 100
 N_neo = 26
 M_neo = 26
 test_sizes = [0, 50, 100, 150, 200, 250, 300, 400, 500, 600, N_neo * M_neo]
-test_sizes = [0, 5, 10, 15, 20, 25, 30, 35]
+# test_sizes = [0, 5, 10, 15, 20, 25, 30, 35]
 
 
-def get_config(path):
-    config.read(path + "/config")
-
-    return config
+### Altering methods
 
 
-def silence_randomly(test_size):
+def set_to_zero(pixel_list):
+    return 0.0
+
+
+def flip_values(pixel_list):
+    return -pixel_list
+
+
+def set_to_random(pixel_list):
+    return np.random.rand(*pixel_list.shape) * 2 - 1
+
+
+### Getting indexes methods
+
+
+def sample_randomly(test_size):
     x, y = np.meshgrid(list(range(N_neo)), list(range(M_neo)))
     xy = [x.ravel(), y.ravel()]
     indices = np.array(xy).T
@@ -51,7 +63,7 @@ def silence_randomly(test_size):
     return random_x, random_y
 
 
-def silence_rectangular(test_size):
+def sample_rectangular(test_size):
     if test_size == 0:
         return [], []
     random_width = np.random.choice(
@@ -74,7 +86,7 @@ def silence_rectangular(test_size):
     return random_x, random_y
 
 
-def silence_circular(test_size):
+def sample_circular(test_size):
     x = np.random.randint(N_neo)
     y = np.random.randint(M_neo)
 
@@ -92,7 +104,10 @@ def silence_circular(test_size):
     return random_x, random_y
 
 
-def get_scores_for_all_subfolders(path, silencing_method_get_indexes):
+### Getting scores methods
+
+
+def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_altering_method):
 
     test_data, target_data = None, None
 
@@ -138,13 +153,22 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes):
             else:
                 print("Data already loaded, continuing")
 
+            # Load network
             network = MovingNCA.get_instance_with(
                 winner_flat, size_neo=(config.scale.test_n_neo, config.scale.test_m_neo), **moving_nca_kwargs
             )
 
+            # Get score for this network for all test sizes
             scores_all_subpaths.append(
                 get_score_for_damage_sizes(
-                    network, config, test_data, target_data, predicting_method, test_sizes, silencing_method_get_indexes
+                    network,
+                    config,
+                    test_data,
+                    target_data,
+                    predicting_method,
+                    test_sizes,
+                    silencing_method_get_indexes,
+                    pixel_altering_method,
                 )
             )
 
@@ -152,33 +176,46 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes):
 
 
 def get_score_for_damage_sizes(
-    network, config, x_data, y_data, predicting_method, test_sizes, silencing_method_get_indexes
+    network, config, x_data, y_data, predicting_method, test_sizes, silencing_method_get_indexes, pixel_altering_method
 ):
     scores = []
     for test_size in tqdm(test_sizes):
-        score = get_networks_silenced_score(
-            test_size, network, config, x_data, y_data, silencing_method_get_indexes, predicting_method
+        # Get network's altered score under test size
+        score = get_networks_altered_score(
+            test_size,
+            network,
+            config,
+            x_data,
+            y_data,
+            silencing_method_get_indexes,
+            predicting_method,
+            pixel_altering_method,
         )
         scores.append(score)
 
     return scores
 
 
-def get_networks_silenced_score(
-    test_size, network, config, x_data, y_data, silencing_method_get_indexes, predicting_method
+def get_networks_altered_score(
+    test_size, network, config, x_data, y_data, silencing_method_get_indexes, predicting_method, pixel_altering_method
 ):
     batch_size = len(x_data)
 
-    # By setting it to 1, we can exit the loop to manipulate state, and then (by not resetting) continue the loop
+    # By setting iterations to 1, we can exit the loop to manipulate state, and then (by not resetting) continue the loop
     network.iterations = 1
 
-    # For each image in the batch, silence a random spot by the current silencing method
+    # For each image in the batch, alter a random spot by the current altering method
     score = 0
     for i in range(batch_size):
         # Silence and get performance
-        silencing_indexes = silencing_method_get_indexes(test_size)
-        class_predictions = silence(
-            network, config, silencing_indexes, x_data[i], visualize=True if test_size == 200 and i == 0 else False
+        to_alter_indexes = silencing_method_get_indexes(test_size)
+        class_predictions = predict_altered(
+            network,
+            config,
+            to_alter_indexes,
+            x_data[i],
+            pixel_altering_method,
+            visualize=True if test_size == 200 and i == 0 else False,
         )
 
         # Record Accuracy
@@ -189,21 +226,24 @@ def get_networks_silenced_score(
     return score / batch_size
 
 
-def silence(network, config, silencing_indexes, x_data_i, visualize=False):
-    silence_index_x, silence_index_y = silencing_indexes
+def predict_altered(network, config, to_alter_indexes, x_data_i, pixel_altering_method, visualize=False):
+    alter_index_x, alter_index_y = to_alter_indexes
 
-    states = []
+    states = []  # Just for plotting
 
     network.reset()
     for _ in range(config.network.iterations):
         class_predictions, _ = network.classify(x_data_i)
-        network.state[silence_index_x, silence_index_y, :] = 0
+        network.state[alter_index_x, alter_index_y, :] = pixel_altering_method(
+            network.state[alter_index_x, alter_index_y, :]
+        )
 
-        states.append(deepcopy(network.state))
+        states.append(deepcopy(network.state))  # Just for plotting
 
-    states = np.array(states)
+    states = np.array(states)  # Just for plotting
     B, _, _, O = states.shape
 
+    # Plot the states
     """if visualize:
         for b in range(B):
             plt.figure()
@@ -211,6 +251,9 @@ def silence(network, config, silencing_indexes, x_data_i, visualize=False):
                 plt.subplot(1, O, o + 1)
                 plt.imshow(states[b, :, :, o], cmap="RdBu", vmin=-1, vmax=1)
         plt.show()"""
+
+    # Set altered values to 0 so that it doesn't mess up prediction
+    network.state[alter_index_x, alter_index_y, :] = set_to_zero(network.state[alter_index_x, alter_index_y, :])
 
     return class_predictions
 
@@ -260,86 +303,6 @@ def plot_average_out_circular():
     plt.show()
 
 
-def past_method():
-    # Moved to its own function because of size.
-    args = parse_args()
-
-    # Read config
-    config.read(args.config)
-    mnist_digits = eval(config.dataset.mnist_digits)
-    loss_function = eval(config.training.loss)
-    predicting_method = eval(config.training.predicting_method)
-
-    # This parameter dictionary will be used for all instances of the network
-    moving_nca_kwargs = {
-        "size_image": (28, 28),  # Changed below if we need to
-        "num_classes": len(mnist_digits),
-        "num_hidden": config.network.hidden_channels,
-        "hidden_neurons": config.network.hidden_neurons,
-        "iterations": config.network.iterations,
-        "position": config.network.position,
-        "moving": config.network.moving,
-        "mnist_digits": mnist_digits,
-    }
-
-    # Data function and kwargs
-    data_func = eval(config.dataset.data_func)
-    kwargs = {
-        "MNIST_DIGITS": mnist_digits,
-        "SAMPLES_PER_DIGIT": 100,
-        "verbose": False,
-        "test": True,
-    }
-    # Taking specific care with the data functions
-    if config.dataset.data_func == "get_MNIST_data_resized":
-        kwargs["size"] = config.dataset.size
-        moving_nca_kwargs["size_image"] = (config.dataset.size, config.dataset.size)
-    elif config.dataset.data_func == "get_MNIST_data_translated":
-        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        moving_nca_kwargs["size_image"] = (70, 70)
-    elif config.dataset.data_func == "get_MNIST_data_padded":
-        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        moving_nca_kwargs["size_image"] = (56, 56)
-
-    winner_flat = Logger.load_checkpoint(args.path)
-
-    # Get test data for new evaluation
-    training_data, target_data = data_func(**kwargs)
-
-    silenced_test_sizes = list(range(0, int(np.sqrt(26**2 + 26**2)) + 1, 1))
-    print(silenced_test_sizes)
-
-    scores = []
-    for silenced in tqdm(silenced_test_sizes):
-        loss, acc = evaluate_nca(
-            winner_flat,
-            training_data,
-            target_data,
-            moving_nca_kwargs,
-            loss_function,
-            predicting_method,
-            verbose=False,
-            visualize=False,
-            return_accuracy=True,
-            N_neo=config.scale.test_n_neo,
-            M_neo=config.scale.test_m_neo,
-            return_confusion=True,
-            silenced=silenced,
-        )
-        print("Score", loss, "acc:", acc)
-        scores.append(acc)
-
-    plt.plot(silenced_test_sizes, scores)
-    plt.vlines(13, linestyles="dashed", label="ca 340/676 cells out on avg", ymin=0, ymax=1)
-    plt.vlines(20, linestyles="dashed", label="ca 550/676 cells out on avg", ymin=0, ymax=1)
-    plt.vlines(30, linestyles="dashed", label="ca all cells out on avg", ymin=0, ymax=1)
-    plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
-    plt.ylabel("Accuracy (%)")
-    plt.xlabel("Radius of randomly placed circle")
-    plt.legend()
-    plt.show()
-
-
 def plot_scores(all_scores, title=None):
     cmap = plt.cm.plasma
 
@@ -371,12 +334,12 @@ def plot_scores(all_scores, title=None):
     plt.show()
 
 
-def show_silencing_effect(silencing_method_get_indexes):
+def show_sampling_effect(sampling_method, pixel_altering_method):
     for size in test_sizes:
         for _ in range(5):
-            x, y = silencing_method_get_indexes(size)
+            x, y = sampling_method(size)
             img = np.ones((28, 28, 1))
-            img[x, y, :] = 0.0
+            img[x, y, :] = pixel_altering_method(img[x, y, :])
 
             plt.imshow(img, cmap="RdBu", vmin=-1, vmax=1)
             plt.show()
@@ -384,9 +347,10 @@ def show_silencing_effect(silencing_method_get_indexes):
 
 if __name__ == "__main__":
     path = "experiments/current_pos_winners"
-    silencing_method_get_indexes = silence_circular
+    sampling_method = sample_rectangular
+    pixel_altering_method = set_to_random
 
-    show_silencing_effect(silencing_method_get_indexes)
+    show_sampling_effect(sampling_method, pixel_altering_method)
 
-    """all_scores = get_scores_for_all_subfolders(path, silencing_method_get_indexes)
-    plot_scores(all_scores, title="Rectangular silencing")"""
+    all_scores = get_scores_for_all_subfolders(path, sampling_method, pixel_altering_method)
+    plot_scores(all_scores, title="Rectangular silencing")
