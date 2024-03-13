@@ -416,6 +416,7 @@ if __name__ == "__main__":
         "position": str(config.network.position),
         "moving": config.network.moving,
         "mnist_digits": mnist_digits,
+        "labels": mnist_digits,
     }
 
     # Data function and kwargs
@@ -437,6 +438,22 @@ if __name__ == "__main__":
         moving_nca_kwargs["size_image"] = (56, 56)
     elif config.dataset.data_func == "get_CIFAR_data":
         moving_nca_kwargs["size_image"] = (32, 32)
+        possibles = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
+        moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
+    elif config.dataset.data_func == "get_MNIST_fashion_data":
+        possibles = [
+            "T-shirt/top",
+            "Trouser",
+            "Pullover",
+            "Dress",
+            "Coat",
+            "Sandal",
+            "Shirt",
+            "Sneaker",
+            "Bag",
+            "Ankle boot",
+        ]
+        moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
 
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
