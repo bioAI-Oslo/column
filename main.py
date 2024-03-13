@@ -132,6 +132,7 @@ def evaluate_nca(
     M_neo=None,
     return_accuracy=False,
     pool_training=False,
+    stable=False,
     return_confusion=False,
     silenced=0,
 ):
@@ -144,6 +145,10 @@ def evaluate_nca(
     """
 
     # assert pool_training == False, "Currently does not support pool training"
+    if stable:
+        extra_episodes_on_digit = 5
+    else:
+        extra_episodes_on_digit = 1
 
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
@@ -160,36 +165,37 @@ def evaluate_nca(
         # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
 
-        class_predictions, guesses = network.classify(
-            img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
-        )
+        for _ in range(extra_episodes_on_digit):
+            class_predictions, guesses = network.classify(
+                img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
+            )
 
-        if visualize and (visualized < args.vis_num):
-            visualized += 1
+            if visualize and (visualized < args.vis_num):
+                visualized += 1
 
-        loss += loss_function(class_predictions, guesses, expected)
+            loss += loss_function(class_predictions, guesses, expected)
 
-        if verbose or return_accuracy:
-            belief = np.mean(class_predictions, axis=(0, 1))
-            believed = predicting_method(class_predictions)
-            actual = np.argmax(expected)
-            accuracy += int(believed == actual)
-            if verbose:
-                print("Expected", expected, "got", belief)
+            if verbose or return_accuracy:
+                belief = np.mean(class_predictions, axis=(0, 1))
+                believed = predicting_method(class_predictions)
+                actual = np.argmax(expected)
+                accuracy += int(believed == actual)
+                if verbose:
+                    print("Expected", expected, "got", belief)
 
-            if return_confusion:
-                conf_matrix[actual, believed] += 1
+                if return_confusion:
+                    conf_matrix[actual, believed] += 1
 
     if verbose:
-        print("Accuracy:", np.round(accuracy * 100 / training_data.shape[0], 2), "%")
+        print("Accuracy:", np.round(accuracy * 100 / (training_data.shape[0] * extra_episodes_on_digit), 2), "%")
 
-    scaled_loss = scale_loss(loss, training_data.shape[0])
+    scaled_loss = scale_loss(loss, training_data.shape[0] * extra_episodes_on_digit)
     if return_confusion:
         if return_accuracy:
-            return scaled_loss, float(accuracy) / float(training_data.shape[0]), conf_matrix
+            return scaled_loss, float(accuracy) / float((training_data.shape[0] * extra_episodes_on_digit)), conf_matrix
         return scaled_loss, conf_matrix
     if return_accuracy:
-        return scaled_loss, float(accuracy) / float(training_data.shape[0])
+        return scaled_loss, float(accuracy) / float((training_data.shape[0] * extra_episodes_on_digit))
     return scaled_loss
 
 
@@ -490,6 +496,7 @@ if __name__ == "__main__":
         return_confusion=True,
         silenced=0,
         pool_training=config.training.pool_training,
+        stable=config.training.stable,
     )
 
     print("Winner had a loss of", loss, "and an accuracy of", acc, "on test data")
