@@ -27,6 +27,7 @@ class MovingNCA(tf.keras.Model):
         size_image=None,
         moving=True,
         mnist_digits=(0, 3, 4),
+        labels=None,
     ):
         super().__init__()
 
@@ -57,6 +58,7 @@ class MovingNCA(tf.keras.Model):
         self.position_addon = 0 if self.position == "None" else 2
 
         self.mnist_digits = mnist_digits
+        self.labels = labels
 
         # Adjustable size
         self.dmodel = tf.keras.Sequential(
@@ -181,9 +183,9 @@ class MovingNCA(tf.keras.Model):
 
         if visualize:
             images = []
-            perceptions_through_time = []
-            outputs_through_time = []
+            states = []
             actions = []
+            perceptions_through_time = []
 
         N_neo, M_neo = self.size_neo
         N_active, M_active = self._size_active
@@ -209,26 +211,27 @@ class MovingNCA(tf.keras.Model):
                 )
 
             if visualize:
-                img = add_channels_single_preexisting(img_raw, self.state)
-                images.append(copy.deepcopy(img))
-                perceptions_through_time.append(copy.deepcopy(self.perceptions))
-                outputs_through_time.append(copy.deepcopy(outputs))
+                images.append(copy.deepcopy(img_raw))
+                states.append(copy.deepcopy(self.state))
                 actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
+                perceptions_through_time.append(copy.deepcopy(self.perceptions))
 
         if visualize:
             self.visualize(
-                images, perceptions_through_time, actions, self.num_hidden, self.num_classes, self.mnist_digits
+                images, states, actions, perceptions_through_time, self.num_hidden, self.num_classes, self.labels
             )
 
         return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
-    def visualize(self, images, perceptions_through_time, actions, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS):
+    def visualize(
+        self, images, states, actions, perceptions_through_time, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS
+    ):
         # It's slower, however the animate function spawns many objects and leads to memory leaks. By using the
         # function in a new process, all objects should be cleaned up at close and the animate function
         # can be used as many times as wanted
         p = mp.Process(
             target=animate,
-            args=(images, perceptions_through_time, actions, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS),
+            args=(images, states, actions, perceptions_through_time, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS),
         )
         p.start()
         p.join()
@@ -247,6 +250,7 @@ class MovingNCA(tf.keras.Model):
         size_image=None,
         moving=True,
         mnist_digits=(0, 3, 4),
+        labels=None,
     ):
         network = MovingNCA(
             num_classes=num_classes,
@@ -258,6 +262,7 @@ class MovingNCA(tf.keras.Model):
             size_image=size_image,
             moving=moving,
             mnist_digits=mnist_digits,
+            labels=labels,
         )
 
         network.set_weights(flat_weights)
