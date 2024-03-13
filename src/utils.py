@@ -5,6 +5,7 @@ liscence """
 
 import json
 import pickle
+import random
 import time
 
 import numpy as np
@@ -93,6 +94,44 @@ def translate(image_batch, new_length: tuple):
 
     new_image_batch = np.array(new_image_batch)
     return new_image_batch
+
+
+# Mia's function
+def get_unique_lists(super_list, number_of_sublist_elements):
+    """
+    For a super_list, f.ex. [0, 1, 2, 3, 4, 5, 6], return every combination with
+    number_of_sublist_elements elements. Combinations are ordered, sampled without
+    replacement. F.ex. [0, 1, 2] are included, but not [1, 0, 2] or [0, 0, 0].
+
+    Args:
+        super_list: list
+        number_of_sublist_elements: int
+
+    Returns: list
+    """
+    combinations = []
+
+    def _unique_lists(current_list, options):
+        if len(current_list) == number_of_sublist_elements:
+            combinations.append([i for i in current_list])
+        else:
+            for o in options:
+                new_options = [i for i in options if i > o]
+                _unique_lists(current_list + [o], new_options)
+
+    _unique_lists([], super_list)
+
+    return combinations
+
+
+def shuffle(X_data, y_data):
+    temp = list(zip(X_data, y_data))
+    random.shuffle(temp)
+    res1, res2 = zip(*temp)
+    # res1 and res2 come out as tuples, and so must be converted to lists.
+    training_data, target_data = np.array(res1), np.array(res2)
+
+    return training_data, target_data
 
 
 if __name__ == "__main__":

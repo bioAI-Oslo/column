@@ -5,18 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.datasets import fashion_mnist, mnist
-from src.utils import translate
-
-
-def shuffle(X_data, y_data):
-    temp = list(zip(X_data, y_data))
-    random.shuffle(temp)
-    res1, res2 = zip(*temp)
-    # res1 and res2 come out as tuples, and so must be converted to lists.
-    training_data, target_data = np.array(res1), np.array(res2)
-
-    return training_data, target_data
-
+from src.utils import shuffle, translate
 
 sorted_X_train = None
 sorted_X_test = None
@@ -47,6 +36,20 @@ def get_MNIST_data_translated(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose
     training_data = translate(training_data, new_length=(70, 70))
 
     return training_data, target_data
+
+
+def get_max_samples_balanced(MNIST_DIGITS, test=False, fashion=False):
+    # To ensure nothing breaks, load a little dataset to initialize the data like normal.
+    get_MNIST_data(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=1, verbose=False, test=test, fashion=fashion)
+
+    # Then, check the smallest amount of data available
+    if test:
+        min_len = min(len(sorted_X_test[i]) for i in range(len(MNIST_DIGITS)))
+    else:
+        min_len = min(len(sorted_X_train[i]) for i in range(len(MNIST_DIGITS)))
+
+    # And return that for a balanced dataset
+    return min_len
 
 
 def get_MNIST_fashion_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False):
@@ -80,8 +83,6 @@ def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, tes
             index = random.randrange(len(sorted_X[i]))
             train_X.append(sorted_X[i][index])
             train_y.append(one_hot)
-            # if verbose:
-            #    print(index, "out of", len(sorted_X[i]))
 
     training_data, target_data = shuffle(train_X, train_y)
 

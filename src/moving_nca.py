@@ -177,6 +177,8 @@ class MovingNCA(tf.keras.Model):
             np.ndarray: The guesses made by the model.
         """
 
+        assert silenced == 0, "Silencing inside classify is no longer supported and should be done outside the loop"
+
         if visualize:
             images = []
             perceptions_through_time = []
@@ -185,29 +187,6 @@ class MovingNCA(tf.keras.Model):
 
         N_neo, M_neo = self.size_neo
         N_active, M_active = self._size_active
-
-        if silenced > 0:
-            x = np.random.randint(N_neo)
-            y = np.random.randint(M_neo)
-
-            radius = silenced
-            random_x, random_y = [], []
-            for i in range(N_neo):
-                for j in range(M_neo):
-                    if np.sqrt((i - x) ** 2 + (j - y) ** 2) < radius:
-                        random_x.append(i)
-                        random_y.append(j)
-
-            random_x = np.array(random_x) + 1
-            random_y = np.array(random_y) + 1
-
-            """x, y = np.meshgrid(list(range(N_neo)), list(range(M_neo)))
-            xy = [x.ravel(), y.ravel()]
-            indices = np.array(xy).T
-
-            random_indices = np.random.choice(range(len(indices)), size=silenced, replace=False)
-
-            random_x, random_y = indices[random_indices].T + 1"""
 
         guesses = None
         for _ in range(self.iterations):
@@ -223,9 +202,6 @@ class MovingNCA(tf.keras.Model):
             self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] + outputs[:, :, : self.input_dim - self.img_channels]
             )
-
-            if silenced > 0:
-                self.state[random_x, random_y, :] = 0
 
             if self.moving:
                 alter_perception_slicing(

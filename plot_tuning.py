@@ -1,5 +1,6 @@
 """Script for plotting tuning results from the folder experiments/tuning. Should never be imported from. 
 If you want to do that, place those functions in plotting_utils.py"""
+
 import os
 import re
 
@@ -105,10 +106,10 @@ def mean_across_inhomogeneous_dimensions(input_array: list):
 
 ######################################## HEATMAP ##########################################
 
-path = "./experiments/tuning_size"
+path = "./experiments/current_pos"
 
 # Detect difference
-feature1, feature2 = "training.loss", "network.hidden_neurons"
+feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
 
 # Get feature 1 and feature 2
 feature1_list, feature2_list = get_features(path, feature1, feature2)
