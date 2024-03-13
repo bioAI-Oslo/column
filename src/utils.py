@@ -124,7 +124,14 @@ def get_unique_lists(super_list, number_of_sublist_elements):
     return combinations
 
 
-def shuffle(X_data, y_data):
+def shuffle(X_data: list, y_data: list):
+    """
+    Shuffles X_data while shuffling y_data in the same manner (they always correspond).
+    F.ex. X_data = [[1, 2], [3, 4]], y_data = [0, 1] -> X_data = [[3, 4], [1, 2]], y_data = [1, 0]
+
+    Returns:
+        list, list
+    """
     temp = list(zip(X_data, y_data))
     random.shuffle(temp)
     res1, res2 = zip(*temp)
@@ -132,14 +139,3 @@ def shuffle(X_data, y_data):
     training_data, target_data = np.array(res1), np.array(res2)
 
     return training_data, target_data
-
-
-if __name__ == "__main__":
-    img = np.ones((28, 28))
-    N_channels = 3
-    N, M = img.shape
-
-    channels = np.random.rand(N, M, N_channels)
-    new_img = add_channels_single_preexisting(img, channels)
-
-    print(new_img[0, 0])
