@@ -11,6 +11,20 @@ sorted_X_train = None
 sorted_X_test = None
 
 
+def get_max_samples_balanced_cifar(MNIST_DIGITS, test=False):
+    # To ensure nothing breaks, load a little dataset to initialize the data like normal.
+    get_CIFAR_data(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=1, verbose=False, test=test)
+
+    # Then, check the smallest amount of data available
+    if test:
+        min_len = min(len(sorted_X_test[i]) for i in range(len(MNIST_DIGITS)))
+    else:
+        min_len = min(len(sorted_X_train[i]) for i in range(len(MNIST_DIGITS)))
+
+    # And return that for a balanced dataset
+    return min_len
+
+
 def get_CIFAR_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False, colors=False):
     global sorted_X_train
     global sorted_X_test

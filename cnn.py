@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-from src.cifar_processing import get_CIFAR_data
+from src.cifar_processing import get_CIFAR_data, get_max_samples_balanced_cifar
 from src.mnist_processing import (
     get_max_samples_balanced,
     get_MNIST_data,
@@ -34,9 +34,12 @@ kwargs = {
     "colors": True if img_channels == 3 else False,
 }
 
-samples_per_digit = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=False, fashion=fashion)
-
-samples_per_digit_test = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=True, fashion=fashion)
+if data_func == get_CIFAR_data:
+    samples_per_digit = get_max_samples_balanced_cifar(MNIST_DIGITS=MNIST_DIGITS, test=False)
+    samples_per_digit_test = get_max_samples_balanced_cifar(MNIST_DIGITS=MNIST_DIGITS, test=True)
+else:
+    samples_per_digit = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=False, fashion=fashion)
+    samples_per_digit_test = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=True, fashion=fashion)
 
 
 class CNN(tf.keras.Model):
