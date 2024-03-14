@@ -81,8 +81,8 @@ def get_config(path):
 
 # Mia's function
 def translate(image_batch, new_length: tuple):
-    assert len(image_batch.shape) == 3, "Translate only works with batches of NxM images"
-    _, N, M = image_batch.shape
+    assert len(image_batch.shape) == 4, "Translate only works with batches of NxM images"
+    _, N, M, _ = image_batch.shape
     new_length = (new_length[0] - N, new_length[1] - M)
     new_image_batch = []
     for image in image_batch:
@@ -90,7 +90,7 @@ def translate(image_batch, new_length: tuple):
         rest_i = new_length[0] - random_split_i
         random_split_j = np.random.randint(0, new_length[1])
         rest_j = new_length[1] - random_split_j
-        new_image_batch.append(np.pad(image, ((random_split_i, rest_i), (random_split_j, rest_j)), "constant"))
+        new_image_batch.append(np.pad(image, ((random_split_i, rest_i), (random_split_j, rest_j), (0, 0)), "constant"))
 
     new_image_batch = np.array(new_image_batch)
     return new_image_batch

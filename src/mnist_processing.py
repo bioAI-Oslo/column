@@ -15,7 +15,7 @@ def get_MNIST_data_padded(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=Fal
     training_data, target_data = get_MNIST_data(MNIST_DIGITS, SAMPLES_PER_DIGIT, verbose, test)
 
     diff_x, diff_y = 14, 14
-    training_data = np.pad(training_data, ((0, 0), (diff_x, diff_y), (diff_x, diff_y)), "constant")
+    training_data = np.pad(training_data, ((0, 0), (diff_x, diff_y), (diff_x, diff_y), (0, 0)), "constant")
 
     return training_data, target_data
 
@@ -114,11 +114,16 @@ def initalize_MNIST_reduced_digits(MNIST_DIGITS=(3, 4), test=False, fashion=Fals
     for i in range(len(MNIST_DIGITS)):
         sorted_X_internal.append(x_scaled[where_digits[i]])
 
+    # Reshaping it to accomodate the network
+    N, M = x[0].shape
+    for i in range(len(MNIST_DIGITS)):
+        sorted_X_internal[i] = np.reshape(sorted_X_internal[i], (len(sorted_X_internal[i]), N, M, 1))
+
     return sorted_X_internal
 
 
-def _test_MNIST_dataset():
-    X_data, y_data = get_MNIST_data(MNIST_DIGITS=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), SAMPLES_PER_DIGIT=3, verbose=True)
+def _test_dataset_func(data_func, kwargs):
+    X_data, y_data = data_func(**kwargs)
 
     for img, lab in zip(X_data, y_data):
         plt.figure()
@@ -128,33 +133,30 @@ def _test_MNIST_dataset():
     plt.show()
 
 
-def _test_MNIST_dataset_time():
+def _test_dataset_func_time(data_func, kwargs):
     start_time = time.time()
-    X_data, y_data = get_MNIST_data(MNIST_DIGITS=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), SAMPLES_PER_DIGIT=10)
+    X_data, y_data = data_func(**kwargs)
     print("Initial load:", time.time() - start_time)
 
     start_time = time.time()
-    X_data, y_data = get_MNIST_data(MNIST_DIGITS=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), SAMPLES_PER_DIGIT=10)
+    X_data, y_data = data_func(**kwargs)
     print("Subsequent load:", time.time() - start_time)
 
     times = 0
     N_times = 100
     for _ in range(N_times):
         start_time = time.time()
-        X_data, y_data = get_MNIST_data(MNIST_DIGITS=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), SAMPLES_PER_DIGIT=10)
+        X_data, y_data = data_func(**kwargs)
         times += time.time() - start_time
     print("Average time after load:", times / N_times)
 
 
 if __name__ == "__main__":
-    np.random.seed(4)
-    images, labels = get_MNIST_data_resized(
-        MNIST_DIGITS=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), SAMPLES_PER_DIGIT=1, size=15, verbose=False, test=False
-    )
-
-    for img, lab in zip(images, labels):
-        plt.figure()
-        plt.imshow(img)
-        plt.title(str(lab))
-
-    plt.show()
+    data_func = get_MNIST_fashion_data
+    kwargs = {
+        "MNIST_DIGITS": (0, 1, 2, 8, 9),
+        "SAMPLES_PER_DIGIT": 3,
+        "verbose": False,
+        "test": False,
+    }
+    _test_dataset_func_time(data_func, kwargs)

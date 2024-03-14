@@ -39,7 +39,7 @@ warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
 # This is just for testing the code
-deterministic = True
+deterministic = False
 if deterministic:
     import random
 
@@ -62,6 +62,7 @@ def evaluate_nca_batch(
     M_neo=None,
     return_accuracy=False,
     pool_training=False,
+    stable=False,
     return_confusion=False,
 ):
     """
@@ -75,18 +76,16 @@ def evaluate_nca_batch(
     """
 
     assert pool_training is False, "Batch currently does not support pool training"
+    assert stable is False, "Batch currently does not support stable training"
     assert visualize is False, "Batch currently does not support visualizing"
 
     # Getting network
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
-    # Reshaping images
-    B, N, M = training_data.shape
-    images_raw = training_data.reshape(B, N, M, 1)
-
     # Reset network and get classifications
+    B = training_data.shape[0]
     network.reset_batched(B)
-    class_predictions, _ = network.classify_batch(images_raw, visualize=False)
+    class_predictions, _ = network.classify_batch(training_data, visualize=False)
 
     # Get loss
     loss = loss_function(class_predictions, None, target_data)
@@ -160,7 +159,7 @@ def evaluate_nca(
             network.reset()
 
         # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
-        img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
+        # img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
 
         for _ in range(extra_episodes_on_digit):
             class_predictions, guesses = network.classify(img_raw, visualize=visualize and (visualized < args.vis_num))
