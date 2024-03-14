@@ -67,7 +67,7 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
         ax_class = fig.add_subplot(2, max_images_on_line, 1 + max_images_on_line + j)
         im_class = ax_class.imshow(states[0, :, :, hidden_channels + j], cmap="RdBu", vmin=-1, vmax=1)
         im_class_list.append(im_class)
-        ax_class.set_title("Class " + labels[j])
+        ax_class.set_title("Class " + str(labels[j]))
     # cb = plt.colorbar(im_class, ax=[ax_class], location="right")
 
     # Keeping track of the little squares because they need careful attention to actually be deleted
