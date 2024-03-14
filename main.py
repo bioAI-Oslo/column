@@ -153,7 +153,7 @@ def evaluate_nca(
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     if return_confusion:
-        conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.int32)
+        conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.float32)
 
     loss = 0
     accuracy = 0
@@ -186,16 +186,21 @@ def evaluate_nca(
                 if return_confusion:
                     conf_matrix[actual, believed] += 1
 
+    if return_accuracy:
+        accuracy /= training_data.shape[0] * extra_episodes_on_digit
+    if return_confusion:
+        conf_matrix /= extra_episodes_on_digit
+
     if verbose:
-        print("Accuracy:", np.round(accuracy * 100 / (training_data.shape[0] * extra_episodes_on_digit), 2), "%")
+        print("Accuracy:", np.round(accuracy * 100, 2), "%")
 
     scaled_loss = scale_loss(loss, training_data.shape[0] * extra_episodes_on_digit)
-    if return_confusion:
-        if return_accuracy:
-            return scaled_loss, float(accuracy) / float((training_data.shape[0] * extra_episodes_on_digit)), conf_matrix
+    if return_confusion and return_accuracy:
+        return scaled_loss, accuracy, conf_matrix
+    elif return_confusion:
         return scaled_loss, conf_matrix
-    if return_accuracy:
-        return scaled_loss, float(accuracy) / float((training_data.shape[0] * extra_episodes_on_digit))
+    elif return_accuracy:
+        return scaled_loss, accuracy
     return scaled_loss
 
 
@@ -289,6 +294,7 @@ def run_optimize(
                 "M_neo": config.scale.train_m_neo,
                 "return_accuracy": False,
                 "pool_training": config.training.pool_training,
+                "stable": config.training.stable,
             }
 
             # Evaluate each candidate solution
@@ -510,4 +516,4 @@ if __name__ == "__main__":
         plt.xlabel("Predicted")
         plt.show()
     else:
-        print(conf)
+        print(conf / (kwargs["SAMPLES_PER_DIGIT"]))
