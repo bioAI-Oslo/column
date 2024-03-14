@@ -18,7 +18,6 @@ from tensorflow.keras.layers import Conv2D, Dense, Input
 class MovingNCA(tf.keras.Model):
     def __init__(
         self,
-        num_classes,
         num_hidden,
         hidden_neurons=10,
         img_channels=1,
@@ -41,7 +40,7 @@ class MovingNCA(tf.keras.Model):
 
         self.img_channels = img_channels
         self.act_channels = 2
-        self.num_classes = num_classes
+        self.num_classes = len(mnist_digits)
         self.num_hidden = num_hidden
         self.input_dim = self.img_channels + self.num_hidden + self.num_classes
         self.output_dim = self.num_hidden + self.num_classes + self.act_channels
@@ -240,7 +239,6 @@ class MovingNCA(tf.keras.Model):
     @staticmethod
     def get_instance_with(
         flat_weights,
-        num_classes,
         num_hidden,
         hidden_neurons,
         img_channels,
@@ -253,7 +251,6 @@ class MovingNCA(tf.keras.Model):
         labels=None,
     ):
         network = MovingNCA(
-            num_classes=num_classes,
             num_hidden=num_hidden,
             hidden_neurons=hidden_neurons,
             img_channels=img_channels,

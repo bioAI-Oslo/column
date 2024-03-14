@@ -416,7 +416,6 @@ if __name__ == "__main__":
     # This parameter dictionary will be used for all instances of the network
     moving_nca_kwargs = {
         "size_image": (28, 28),  # Changed below if we need to
-        "num_classes": len(mnist_digits),
         "num_hidden": config.network.hidden_channels,
         "hidden_neurons": config.network.hidden_neurons,
         "img_channels": config.network.img_channels,
