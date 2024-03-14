@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.datasets import cifar10
-from utils import shuffle
+from src.utils import shuffle
 
 sorted_X_train = None
 sorted_X_test = None
