@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.datasets import cifar10
-from src.utils import shuffle
+from utils import shuffle
 
 sorted_X_train = None
 sorted_X_test = None
@@ -77,6 +77,8 @@ def initalize_CIFAR_reduced_classes(MNIST_DIGITS=(3, 4), test=False, colors=Fals
         x_list = []
         for img in x:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            N, M = img.shape
+            img = img.reshape((N, M, 1))
             x_list.append(img)
         x = np.array(x_list)
 
@@ -97,15 +99,43 @@ def initalize_CIFAR_reduced_classes(MNIST_DIGITS=(3, 4), test=False, colors=Fals
     return sorted_X_internal
 
 
-if __name__ == "__main__":
-    # 0: airplane, 1: automobile, 2: bird, 3: cat, 4: deer, 5: dog, 6: frog, 7: horse, 8: ship, 9: truck
-    x_data, y_data = get_CIFAR_data(
-        MNIST_DIGITS=(0, 1, 2, 3, 4), SAMPLES_PER_DIGIT=4, verbose=True, test=False, colors=True
-    )
+def _test_dataset_func(data_func, kwargs):
+    X_data, y_data = data_func(**kwargs)
 
-    for img, lab in zip(x_data, y_data):
+    for img, lab in zip(X_data, y_data):
+        print("Shape image:", img.shape)
         plt.figure()
         plt.imshow(img)
         plt.title(str(lab))
 
     plt.show()
+
+
+def _test_dataset_func_time(data_func, kwargs):
+    start_time = time.time()
+    X_data, y_data = data_func(**kwargs)
+    print("Initial load:", time.time() - start_time)
+
+    start_time = time.time()
+    X_data, y_data = data_func(**kwargs)
+    print("Subsequent load:", time.time() - start_time)
+
+    times = 0
+    N_times = 100
+    for _ in range(N_times):
+        start_time = time.time()
+        X_data, y_data = data_func(**kwargs)
+        times += time.time() - start_time
+    print("Average time after load:", times / N_times)
+
+
+if __name__ == "__main__":
+    data_func = get_CIFAR_data
+    kwargs = {
+        "MNIST_DIGITS": (0, 1, 2, 8, 9),
+        "SAMPLES_PER_DIGIT": 3,
+        "verbose": False,
+        "test": False,
+        "colors": True,
+    }
+    _test_dataset_func(data_func, kwargs)
