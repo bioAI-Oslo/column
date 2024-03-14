@@ -21,6 +21,7 @@ class MovingNCA(tf.keras.Model):
         num_classes,
         num_hidden,
         hidden_neurons=10,
+        img_channels=1,
         iterations=50,
         position="None",
         size_neo=None,
@@ -38,7 +39,7 @@ class MovingNCA(tf.keras.Model):
         self.size_neo = get_dimensions(size_image, size_neo)
         self._size_active = (size_image[0] - 2, size_image[1] - 2)
 
-        self.img_channels = 1
+        self.img_channels = img_channels
         self.act_channels = 2
         self.num_classes = num_classes
         self.num_hidden = num_hidden
@@ -166,7 +167,7 @@ class MovingNCA(tf.keras.Model):
         # I should really phase out having guesses here, I don't use it for anything... TODO
         return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
-    def classify(self, img_raw, visualize=False, silenced=0):
+    def classify(self, img_raw, visualize=False):
         """
         Classify the input image using the trained model.
 
@@ -178,8 +179,6 @@ class MovingNCA(tf.keras.Model):
             np.ndarray: The state of the model after classification.
             np.ndarray: The guesses made by the model.
         """
-
-        assert silenced == 0, "Silencing inside classify is no longer supported and should be done outside the loop"
 
         if visualize:
             images = []
@@ -244,6 +243,7 @@ class MovingNCA(tf.keras.Model):
         num_classes,
         num_hidden,
         hidden_neurons,
+        img_channels,
         iterations,
         position,
         size_neo=None,
@@ -256,6 +256,7 @@ class MovingNCA(tf.keras.Model):
             num_classes=num_classes,
             num_hidden=num_hidden,
             hidden_neurons=hidden_neurons,
+            img_channels=img_channels,
             iterations=iterations,
             position=position,
             size_neo=size_neo,

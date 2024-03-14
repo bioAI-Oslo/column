@@ -39,7 +39,7 @@ warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
 # This is just for testing the code
-deterministic = False
+deterministic = True
 if deterministic:
     import random
 
@@ -63,7 +63,6 @@ def evaluate_nca_batch(
     return_accuracy=False,
     pool_training=False,
     return_confusion=False,
-    silenced=0,
 ):
     """
     Network creation took 0.10552453994750977 # Amounts to 26 minutes extra across 15000 gens
@@ -77,7 +76,6 @@ def evaluate_nca_batch(
 
     assert pool_training is False, "Batch currently does not support pool training"
     assert visualize is False, "Batch currently does not support visualizing"
-    assert silenced == 0, "Batch currently does not support silencing"
 
     # Getting network
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
@@ -134,7 +132,6 @@ def evaluate_nca(
     pool_training=False,
     stable=False,
     return_confusion=False,
-    silenced=0,
 ):
     """
     Network creation time: 0.015133857727050781 # Amounts to 225 seconds extra across 15000 gens
@@ -166,9 +163,7 @@ def evaluate_nca(
         img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
 
         for _ in range(extra_episodes_on_digit):
-            class_predictions, guesses = network.classify(
-                img_raw, visualize=visualize and (visualized < args.vis_num), silenced=silenced
-            )
+            class_predictions, guesses = network.classify(img_raw, visualize=visualize and (visualized < args.vis_num))
 
             if visualize and (visualized < args.vis_num):
                 visualized += 1
@@ -424,6 +419,7 @@ if __name__ == "__main__":
         "num_classes": len(mnist_digits),
         "num_hidden": config.network.hidden_channels,
         "hidden_neurons": config.network.hidden_neurons,
+        "img_channels": config.network.img_channels,
         "iterations": config.network.iterations,
         "position": str(config.network.position),
         "moving": config.network.moving,
@@ -500,7 +496,6 @@ if __name__ == "__main__":
         N_neo=config.scale.test_n_neo,
         M_neo=config.scale.test_m_neo,
         return_confusion=True,
-        silenced=0,
         pool_training=config.training.pool_training,
         stable=config.training.stable,
     )
