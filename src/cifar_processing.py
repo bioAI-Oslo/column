@@ -9,11 +9,12 @@ from src.utils import shuffle
 
 sorted_X_train = None
 sorted_X_test = None
+loaded_digits = None
 
 
-def get_max_samples_balanced_cifar(MNIST_DIGITS, test=False):
+def get_max_samples_balanced_cifar(MNIST_DIGITS, test=False, colors=False):
     # To ensure nothing breaks, load a little dataset to initialize the data like normal.
-    get_CIFAR_data(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=1, verbose=False, test=test)
+    get_CIFAR_data(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=1, verbose=False, test=test, colors=colors)
 
     # Then, check the smallest amount of data available
     if test:
@@ -28,13 +29,24 @@ def get_max_samples_balanced_cifar(MNIST_DIGITS, test=False):
 def get_CIFAR_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False, colors=False):
     global sorted_X_train
     global sorted_X_test
+    global loaded_digits
+
+    # Do the loaded digits correspond to the MNIST_DIGITS?
+    if loaded_digits is None or MNIST_DIGITS != loaded_digits:
+        # Reload
+        loaded_digits = MNIST_DIGITS
+        sorted_X_train = None
+        sorted_X_test = None
+        if verbose:
+            print("Loading new CIFAR data")
+
     if verbose:
         print("Getting", "training" if not test else "test", "data")
-    if not test and sorted_X_train is None:
+    if not test and (sorted_X_train is None):
         if verbose:
             print("Initializing CIFAR training data")
         sorted_X_train = initalize_CIFAR_reduced_classes(MNIST_DIGITS, test=False, colors=colors)
-    elif test and sorted_X_test is None:
+    elif test and (sorted_X_test is None):
         if verbose:
             print("Initializing CIFAR test data")
         sorted_X_test = initalize_CIFAR_reduced_classes(MNIST_DIGITS, test=True, colors=colors)
@@ -132,10 +144,17 @@ def _test_dataset_func_time(data_func, kwargs):
 if __name__ == "__main__":
     data_func = get_CIFAR_data
     kwargs = {
-        "MNIST_DIGITS": (0, 1, 2, 8, 9),
+        "MNIST_DIGITS": (0, 1, 2, 3, 4),
         "SAMPLES_PER_DIGIT": 3,
-        "verbose": False,
+        "verbose": True,
         "test": False,
         "colors": True,
     }
+    # _test_dataset_func(data_func, kwargs)
+
+    X_data, y_data = data_func(**kwargs)
+    X_data, y_data = data_func(**kwargs)
+
+    kwargs["MNIST_DIGITS"] = (5, 6, 7, 8, 9)
     _test_dataset_func(data_func, kwargs)
+    X_data, y_data = data_func(**kwargs)

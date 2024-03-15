@@ -9,6 +9,7 @@ from src.utils import shuffle, translate
 
 sorted_X_train = None
 sorted_X_test = None
+loaded_digits = None
 
 
 def get_MNIST_data_padded(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False):
@@ -59,13 +60,25 @@ def get_MNIST_fashion_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=Fa
 def get_MNIST_data(MNIST_DIGITS=(3, 4), SAMPLES_PER_DIGIT=10, verbose=False, test=False, fashion=False):
     global sorted_X_train
     global sorted_X_test
+    global loaded_digits
+
+    # Do the loaded digits correspond to the MNIST_DIGITS?
+    # Do the loaded digits correspond to the MNIST_DIGITS?
+    if loaded_digits is None or MNIST_DIGITS != loaded_digits:
+        # Reload
+        loaded_digits = MNIST_DIGITS
+        sorted_X_train = None
+        sorted_X_test = None
+        if verbose:
+            print("Loading new MNIST data")
+
     if verbose:
         print("Getting", "training" if not test else "test", "data")
-    if not test and sorted_X_train is None:
+    if not test and (sorted_X_train is None):
         if verbose:
             print("Initializing MNIST training data")
         sorted_X_train = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=False, fashion=fashion)
-    elif test and sorted_X_test is None:
+    elif test and (sorted_X_test is None):
         if verbose:
             print("Initializing MNIST test data")
         sorted_X_test = initalize_MNIST_reduced_digits(MNIST_DIGITS, test=True, fashion=fashion)
