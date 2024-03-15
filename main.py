@@ -39,7 +39,7 @@ warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
 # Supression part over
 
 # This is just for testing the code
-deterministic = False
+deterministic = True
 if deterministic:
     import random
 
@@ -311,6 +311,9 @@ def run_optimize(
             if g % config.logging.plotting_interval == 0 or visualize_this_gen:
                 winner_flat = solutions[np.argmin(solutions_fitness)]
 
+                # Testing data is not from test set to avoid overfitting (as in, me choosing models that work well on test set)
+                # Meanwhile, all testing later is done on test set to make sure it's not overfitted
+                # This simply compares the winning network on different data (as CMA-ES will overfit within a generation)
                 testing_data, target_data_test = data_func(**data_kwargs)
 
                 # Alter kwargs for testing. We don't need to change it back
@@ -446,6 +449,7 @@ if __name__ == "__main__":
         moving_nca_kwargs["size_image"] = (32, 32)
         possibles = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
         moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
+        kwargs["colors"] = config.dataset.colors
     elif config.dataset.data_func == "get_MNIST_fashion_data":
         possibles = [
             "T-shirt/top",

@@ -349,7 +349,7 @@ def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
     for x in range(N_neo):
         for y in range(M_neo):
             x_p, y_p = perceptions[x, y]
-            perc = img[x_p : x_p + 3, y_p : y_p + 3, :1]
+            perc = img[x_p : x_p + 3, y_p : y_p + 3, :]
             comms = state[x : x + 3, y : y + 3, :]
             dummy = np.concatenate((perc, comms), axis=2)
             dummy_flat = dummy.flatten()

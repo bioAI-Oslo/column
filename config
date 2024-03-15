@@ -2,9 +2,9 @@
 maxgen = 10
 popsize = 30
 init_sigma = 0.001
-threads = 4
-pool_training = True 
-stable = True
+threads = 1
+pool_training = False
+stable = False
 loss = pixel_wise_CE_and_energy
 predicting_method = highest_value
 
@@ -25,6 +25,8 @@ samples_per_digit = 10
 data_func = get_MNIST_data
 # Size only matters if data_func = get_MNIST_data_resized
 size = 28
+# Colors only matters if data_func = get_CIFAR_data
+colors = False
 
 [NETWORK]
 hidden_channels = 2

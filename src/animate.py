@@ -40,7 +40,10 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
 
     # Plot image
     ax_img = fig.add_subplot(2, max_images_on_line, 1)
-    im = ax_img.imshow(images[0], cmap="gray")
+    if len(images[0][0][0]) == 1:
+        im = ax_img.imshow(images[0], cmap="gray")
+    else:
+        im = ax_img.imshow(images[0])
     ax_img.set_title("Image")
 
     # Plot hidden channels
