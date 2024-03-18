@@ -106,7 +106,7 @@ def mean_across_inhomogeneous_dimensions(input_array: list):
 
 ######################################## HEATMAP ##########################################
 
-path = "./experiments/current_pos"
+path = "./experiments/color_cifar"
 
 # Detect difference
 feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"

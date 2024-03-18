@@ -7,19 +7,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-from src.cifar_processing import get_CIFAR_data, get_max_samples_balanced_cifar
-from src.mnist_processing import (
-    get_max_samples_balanced,
-    get_MNIST_data,
-    get_MNIST_data_padded,
-    get_MNIST_data_resized,
-)
 from src.utils import get_unique_lists, get_weights_info
 from tensorflow.keras import optimizers
 from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
 from tqdm import tqdm
 
-MNIST_DIGITS = (0, 9)
+from column.src.data_processing import (
+    get_CIFAR_data,
+    get_max_samples_balanced,
+    get_MNIST_data,
+    get_MNIST_data_padded,
+    get_MNIST_data_resized,
+)
+
+CLASSES = (1, 4, 6, 7, 8)
 trained_image_size = 32
 img_channels = 3
 fashion = False
@@ -29,17 +30,13 @@ saved_model = "./experiments/cnn/checkpoint_model_cifar.ckpt"
 # Data
 data_func = get_CIFAR_data
 kwargs = {
-    "MNIST_DIGITS": MNIST_DIGITS,
+    "CLASSES": CLASSES,
     "verbose": False,
     "colors": True if img_channels == 3 else False,
 }
 
-if data_func == get_CIFAR_data:
-    samples_per_digit = get_max_samples_balanced_cifar(MNIST_DIGITS=MNIST_DIGITS, test=False)
-    samples_per_digit_test = get_max_samples_balanced_cifar(MNIST_DIGITS=MNIST_DIGITS, test=True)
-else:
-    samples_per_digit = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=False, fashion=fashion)
-    samples_per_digit_test = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=True, fashion=fashion)
+samples_per_digit = get_max_samples_balanced(data_func, kwargs, test=False)
+samples_per_digit_test = get_max_samples_balanced(data_func, kwargs, test=True)
 
 
 class CNN(tf.keras.Model):
@@ -48,10 +45,10 @@ class CNN(tf.keras.Model):
 
         self.dmodel = tf.keras.Sequential(
             [
-                Conv2D(3, 3, padding="valid", input_shape=img_dim, activation="linear"),
-                Conv2D(3, 3, padding="valid", activation="linear"),
+                Conv2D(10, 5, padding="valid", input_shape=img_dim, activation="tanh"),
+                Conv2D(10, 3, padding="valid", activation="tanh"),
                 MaxPooling2D(pool_size=(2, 2)),
-                Conv2D(3, 3, padding="valid", activation="linear"),
+                Conv2D(10, 3, padding="valid", activation="tanh"),
                 MaxPooling2D(pool_size=(2, 2)),
                 Flatten(),
                 Dense(digits),
@@ -79,7 +76,7 @@ def resize_for_CNN(size, mnist_digits):
     # First, get normal resized data that the MovingNCA could handle well
     data_func = get_MNIST_data_resized
     test_x, test_y = data_func(
-        MNIST_DIGITS=mnist_digits, SAMPLES_PER_DIGIT=samples_per_digit_test, size=size, verbose=False, test=True
+        CLASSES=mnist_digits, SAMPLES_PER_CLASS=samples_per_digit_test, size=size, verbose=False, test=True
     )
 
     # Then, resize to again be 56x56, with whatever information loss was incurred
@@ -93,7 +90,7 @@ def resize_for_CNN(size, mnist_digits):
 
 
 def get_model():
-    model = CNN(digits=len(MNIST_DIGITS))
+    model = CNN(digits=len(CLASSES))
     model.compile(
         optimizers.Adam(lr=1e-4),
         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
@@ -113,7 +110,7 @@ def plot_image_scale_always_full_size():
 
     for size in range(start_size, trained_image_size + 1):
         # Get data
-        test_x, test_y = resize_for_CNN(size, MNIST_DIGITS)
+        test_x, test_y = resize_for_CNN(size, CLASSES)
 
         # Evaluate model at this size
         test_loss, test_acc = model.evaluate(test_x, test_y)
@@ -132,9 +129,9 @@ def plot_weights_dense():
     dense_layer = np.array(model.weights[0]).T
     print(dense_layer.shape)
 
-    for i in range(len(MNIST_DIGITS)):
+    for i in range(len(CLASSES)):
         reshapen = np.reshape(dense_layer[i], (trained_image_size, trained_image_size))
-        plt.subplot(1, len(MNIST_DIGITS), i + 1)
+        plt.subplot(1, len(CLASSES), i + 1)
         plt.imshow(reshapen)
 
     plt.show()
@@ -146,26 +143,26 @@ def plot_weights_conv():
     first_conv_layer = np.array(model.weights[0]).T
 
     for i in range(len(first_conv_layer)):
-        plt.subplot(4, len(MNIST_DIGITS), i + 1)
+        plt.subplot(4, len(CLASSES), i + 1)
         plt.imshow(first_conv_layer[i, 0])
 
     second_conv_layer = np.array(model.weights[2]).T
 
     for i in range(len(second_conv_layer)):
-        plt.subplot(4, len(MNIST_DIGITS), i + 1 + len(MNIST_DIGITS))
+        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES))
         plt.imshow(second_conv_layer[i])
 
     third_conv_layer = np.array(model.weights[4]).T
 
     for i in range(len(third_conv_layer)):
-        plt.subplot(4, len(MNIST_DIGITS), i + 1 + len(MNIST_DIGITS) * 2)
+        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES) * 2)
         plt.imshow(third_conv_layer[i])
 
     dense_layer = np.array(model.weights[6]).T
 
-    for i in range(len(MNIST_DIGITS)):
+    for i in range(len(CLASSES)):
         reshapen = np.reshape(dense_layer[i], (5, 5, 3))
-        plt.subplot(4, len(MNIST_DIGITS), i + 1 + len(MNIST_DIGITS) * 3)
+        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES) * 3)
         plt.imshow(reshapen)
 
     plt.show()
@@ -175,9 +172,7 @@ def plot_feature_maps():
     model = get_model()
 
     middle_images = []
-    image = data_func(MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=samples_per_digit_test, verbose=False, test=True)[0][
-        0
-    ]
+    image = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=samples_per_digit_test, verbose=False, test=True)[0][0]
 
     image = np.expand_dims(image, axis=0)
     image = np.expand_dims(image, axis=-1)
@@ -209,7 +204,7 @@ def plot_image_scale():
     for size in range(7, trained_image_size + 1):
         # Get data
         test_x, test_y = get_MNIST_data_resized(
-            MNIST_DIGITS=MNIST_DIGITS, SAMPLES_PER_DIGIT=samples_per_digit_test, size=size, verbose=False, test=True
+            CLASSES=CLASSES, SAMPLES_PER_CLASS=samples_per_digit_test, size=size, verbose=False, test=True
         )
 
         # Pad with zeros so that the network will accept it
@@ -232,7 +227,7 @@ def plot_image_scale():
 def plot_picture_damage():
     model = get_model()
 
-    test_x, test_y = data_func(**kwargs, SAMPLES_PER_DIGIT=samples_per_digit_test, test=True)
+    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
     B, N, M = test_x.shape
 
     radius = 5
@@ -269,10 +264,10 @@ def main():
     train_batches = 200
 
     # Script wide functions
-    train_x, train_y = data_func(**kwargs, SAMPLES_PER_DIGIT=samples_per_digit)
-    test_x, test_y = data_func(**kwargs, SAMPLES_PER_DIGIT=samples_per_digit_test, test=True)
+    train_x, train_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit)
+    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
 
-    model = CNN(digits=len(MNIST_DIGITS))
+    model = CNN(digits=len(CLASSES))
     model.compile(
         optimizers.Adam(lr=1e-4),
         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
@@ -293,13 +288,13 @@ def main():
 
 def confusion_matrix():
     model = get_model()
-    test_x, test_y = data_func(**kwargs, SAMPLES_PER_DIGIT=samples_per_digit_test, test=True)
+    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
 
     predictions = model.predict(test_x)
     predictions = np.argmax(predictions, axis=1)
     test_y = np.argmax(test_y, axis=1)
 
-    confusion = np.zeros((len(MNIST_DIGITS), len(MNIST_DIGITS)))
+    confusion = np.zeros((len(CLASSES), len(CLASSES)))
     for pred, real in zip(predictions, test_y):
         confusion[pred, real] += 1
 
@@ -313,26 +308,36 @@ def confusion_matrix():
 
 
 def find_easiest_digits():
-    global MNIST_DIGITS
+    global CLASSES
     global kwargs
     global samples_per_digit
 
-    combinations = get_unique_lists([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 5)
+    combinations = get_unique_lists(
+        [1, 2, 3, 4, 5, 6, 7, 8], 5
+    )  # Removes (automobile/truck 1/9 and plane/bird 0/2 choice)
     print("Found", len(combinations), "combinations")
 
     accuracies = []
     for i, list_i in enumerate(combinations):
         print(i, ":", list_i)
-        MNIST_DIGITS = list_i
+        CLASSES = list_i
         kwargs = {
-            "MNIST_DIGITS": MNIST_DIGITS,
+            "CLASSES": CLASSES,
             "verbose": False,
+            "colors": True if img_channels == 3 else False,
         }
 
-        samples_per_digit = get_max_samples_balanced(MNIST_DIGITS=MNIST_DIGITS, test=False, fashion=fashion)
+        if "MNIST" in str(data_func):
+            samples_per_digit = get_max_samples_balanced(CLASSES=CLASSES, test=False, fashion=fashion)
+            print(samples_per_digit)
+        elif "CIFAR" in str(data_func):
+            samples_per_digit = get_max_samples_balanced_cifar(CLASSES=CLASSES, test=False, colors=kwargs["colors"])
+        else:
+            print("OOOPS")
 
         acc = main()
         accuracies.append(acc)
+        print("Acc:", acc, "\n")
 
     scores_dict = {}
     for list_i, acc in zip(combinations, accuracies):
@@ -345,4 +350,4 @@ def find_easiest_digits():
 
 
 if __name__ == "__main__":
-    find_easiest_digits()
+    main()

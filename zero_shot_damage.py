@@ -8,6 +8,7 @@ import numpy as np
 import seaborn as sns
 from localconfig import config
 from main import evaluate_nca
+from src.data_processing import get_MNIST_data
 from src.logger import Logger
 from src.loss import (
     global_mean_medians,
@@ -19,7 +20,6 @@ from src.loss import (
     pixel_wise_L2_and_CE,
     scale_loss,
 )
-from src.mnist_processing import get_MNIST_data
 from src.moving_nca import MovingNCA
 from src.utils import get_config
 from tqdm import tqdm
@@ -143,8 +143,8 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_alte
                 print("Fetching data")
                 data_func = get_MNIST_data
                 kwargs = {
-                    "MNIST_DIGITS": mnist_digits,
-                    "SAMPLES_PER_DIGIT": NUM_DATA,
+                    "CLASSES": mnist_digits,
+                    "SAMPLES_PER_CLASS": NUM_DATA,
                     "verbose": False,
                     "test": True,
                 }

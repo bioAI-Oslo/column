@@ -11,7 +11,14 @@ from localconfig import config
 # Suppressing deprecation warnings from numba because it floods
 # the error logs files.
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-from src.cifar_processing import get_CIFAR_data
+from src.data_processing import (
+    get_CIFAR_data,
+    get_MNIST_data,
+    get_MNIST_data_padded,
+    get_MNIST_data_resized,
+    get_MNIST_data_translated,
+    get_MNIST_fashion_data,
+)
 from src.logger import Logger
 from src.loss import (
     energy,
@@ -23,13 +30,6 @@ from src.loss import (
     pixel_wise_L2,
     pixel_wise_L2_and_CE,
     scale_loss,
-)
-from src.mnist_processing import (
-    get_MNIST_data,
-    get_MNIST_data_padded,
-    get_MNIST_data_resized,
-    get_MNIST_data_translated,
-    get_MNIST_fashion_data,
 )
 from src.moving_nca import MovingNCA
 from src.utils import get_weights_info
@@ -431,8 +431,8 @@ if __name__ == "__main__":
     # Data function and kwargs
     data_func = eval(config.dataset.data_func)
     kwargs = {
-        "MNIST_DIGITS": mnist_digits,
-        "SAMPLES_PER_DIGIT": config.dataset.samples_per_digit,
+        "CLASSES": mnist_digits,
+        "SAMPLES_PER_CLASS": config.dataset.samples_per_digit,
         "verbose": False,
     }
     # Taking specific care with the data functions
@@ -508,9 +508,9 @@ if __name__ == "__main__":
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        sns.heatmap(conf / (kwargs["SAMPLES_PER_DIGIT"]), annot=True, cmap="plasma")
+        sns.heatmap(conf / (kwargs["SAMPLES_PER_CLASS"]), annot=True, cmap="plasma")
         plt.ylabel("Real")
         plt.xlabel("Predicted")
         plt.show()
     else:
-        print(conf / (kwargs["SAMPLES_PER_DIGIT"]))
+        print(conf / (kwargs["SAMPLES_PER_CLASS"]))

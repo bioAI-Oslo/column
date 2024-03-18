@@ -3,8 +3,8 @@ from copy import deepcopy
 import numpy as np
 from localconfig import config
 from matplotlib import pyplot as plt
+from src.data_processing import get_MNIST_data
 from src.logger import Logger
-from src.mnist_processing import get_MNIST_data
 from src.moving_nca import MovingNCA
 
 
@@ -26,7 +26,7 @@ def show_weights(network):
 
 
 def show_diff_map(network, config, mnist_digits):
-    x_data, y_data = get_MNIST_data(MNIST_DIGITS=mnist_digits, SAMPLES_PER_DIGIT=100, verbose=False, test=True)
+    x_data, y_data = get_MNIST_data(CLASSES=mnist_digits, SAMPLES_PER_CLASS=100, verbose=False, test=True)
     x_data = np.reshape(x_data, (len(x_data), 28, 28, 1))
 
     network.reset()

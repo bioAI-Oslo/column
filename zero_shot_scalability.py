@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from localconfig import config
 from main import evaluate_nca, evaluate_nca_batch
+from src.data_processing import get_MNIST_data
 from src.logger import Logger
 from src.loss import (
     global_mean_medians,
@@ -14,7 +15,6 @@ from src.loss import (
     pixel_wise_L2,
     scale_loss,
 )
-from src.mnist_processing import get_MNIST_data
 from tqdm import tqdm
 
 
@@ -69,8 +69,8 @@ for numebr, sub_folder in enumerate(os.listdir(path)):  # For each subfolder in 
             print("Fetching data")
             data_func = get_MNIST_data
             kwargs = {
-                "MNIST_DIGITS": mnist_digits,
-                "SAMPLES_PER_DIGIT": NUM_DATA,
+                "CLASSES": mnist_digits,
+                "SAMPLES_PER_CLASS": NUM_DATA,
                 "verbose": False,
                 "test": True,
             }
