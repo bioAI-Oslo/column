@@ -66,7 +66,7 @@ class MovingNCA(tf.keras.Model):
                 Dense(
                     hidden_neurons,
                     input_dim=self.input_dim * 3 * 3 + self.position_addon,
-                    activation="linear",
+                    activation="tanh",
                 ),
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
