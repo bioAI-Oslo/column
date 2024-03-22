@@ -18,6 +18,8 @@ from src.data_processing import (
     get_MNIST_data_resized,
     get_MNIST_data_translated,
     get_MNIST_fashion_data,
+    get_simple_object,
+    get_simple_pattern,
 )
 from src.logger import Logger
 from src.loss import (
@@ -417,7 +419,7 @@ if __name__ == "__main__":
 
     # This parameter dictionary will be used for all instances of the network
     moving_nca_kwargs = {
-        "size_image": (28, 28),  # Changed below if we need to
+        "size_image": (config.dataset.size, config.dataset.size),
         "num_hidden": config.network.hidden_channels,
         "hidden_neurons": config.network.hidden_neurons,
         "img_channels": config.network.img_channels,
@@ -438,15 +440,14 @@ if __name__ == "__main__":
     # Taking specific care with the data functions
     if config.dataset.data_func == "get_MNIST_data_resized":
         kwargs["size"] = config.dataset.size
-        moving_nca_kwargs["size_image"] = (config.dataset.size, config.dataset.size)
     elif config.dataset.data_func == "get_MNIST_data_translated":
         # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        moving_nca_kwargs["size_image"] = (70, 70)
+        pass
     elif config.dataset.data_func == "get_MNIST_data_padded":
         # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        moving_nca_kwargs["size_image"] = (56, 56)
+        pass
     elif config.dataset.data_func == "get_CIFAR_data":
-        moving_nca_kwargs["size_image"] = (32, 32)
+        pass
         possibles = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
         moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
         kwargs["colors"] = config.dataset.colors

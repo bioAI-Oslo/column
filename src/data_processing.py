@@ -55,7 +55,75 @@ def get_max_samples_balanced(data_func, **kwargs):
     return min_len
 
 
-def get_MNIST_data_padded(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False):
+def get_simple_pattern(verbose=False, **kwargs):
+    """Only for quick testing"""
+
+    if verbose:
+        print("Generating simple pattern")
+
+    class_0 = np.zeros((10, 10, 1))
+    class_1 = np.zeros((10, 10, 1))
+
+    class_0[[i for i in range(0, 10, 2)], :, 0] = 1.0
+    class_0[:, [i for i in range(0, 10, 2)], 0] = 1.0
+
+    class_1[[i for i in range(0, 10, 2)], ::2, 0] = 1.0
+    class_1[1::2, [i for i in range(1, 10, 2)], 0] = 1.0
+
+    training_data = np.array([class_0, class_1])
+    target_data = np.array([[1, 0], [0, 1]], dtype=np.float32)
+
+    return training_data, target_data
+
+
+def get_simple_object(verbose=False, **kwargs):
+    """Only for quick testing"""
+
+    def mug_image_gen(N, M):
+        mug_image = np.zeros((N, M, 1))
+
+        mug_image[3 * N // 10 : 8 * N // 10, 2 * M // 10 : 6 * M // 10, 0] = 1.0
+        mug_image[4 * N // 10 : 7 * N // 10, 6 * M // 10 : 8 * M // 10, 0] = 1.0
+        mug_image[5 * N // 10 : 6 * N // 10, 6 * M // 10 : 7 * M // 10, 0] = 0.0
+
+        return mug_image
+
+    def bowl_image_gen(N, M):
+        bowl_image = np.zeros((N, M, 1))
+
+        r_i = 2 * N // 10
+        r_o = 4 * N // 10
+        for x in range(N // 2, N):
+            for y in range(M):
+                if r_i**2 <= (x - N / 2) ** 2 + (y - M / 2) ** 2 <= r_o**2:
+                    bowl_image[x - N // 4, y, 0] = 1.0
+
+        return bowl_image
+
+    def knife_image_gen(N, M):
+        knife_image = np.zeros((N, M, 1))
+
+        knife_image[1 * N // 10 : 9 * N // 10, 5 * M // 10 : 6 * M // 10, 0] = 1.0
+        knife_image[1 * N // 10 : 6 * N // 10, 4 * M // 10 : 6 * M // 10, 0] = 1.0
+
+        return knife_image
+
+    if verbose:
+        print("Generating moving pattern")
+
+    N, M = 10, 10
+    pad_factor = 4
+    class_0 = np.pad(mug_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
+    class_1 = np.pad(knife_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
+    class_2 = np.pad(bowl_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
+
+    training_data = np.array([class_0, class_1, class_2])
+    target_data = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32)
+
+    return training_data, target_data
+
+
+def get_MNIST_data_padded(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     training_data, target_data = get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
     diff_x, diff_y = 14, 14
@@ -64,7 +132,7 @@ def get_MNIST_data_padded(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, t
     return training_data, target_data
 
 
-def get_MNIST_data_resized(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, size=56, verbose=False, test=False):
+def get_MNIST_data_resized(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, size=56, verbose=False, test=False, **kwargs):
     training_data, target_data = get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
     resized_x_data = []
@@ -74,7 +142,7 @@ def get_MNIST_data_resized(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, size=56, verbos
     return np.array(resized_x_data), target_data
 
 
-def get_MNIST_data_translated(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False):
+def get_MNIST_data_translated(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     training_data, target_data = get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
     training_data = translate(training_data, new_length=(70, 70))
@@ -82,15 +150,15 @@ def get_MNIST_data_translated(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=Fals
     return training_data, target_data
 
 
-def get_MNIST_fashion_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False):
+def get_MNIST_fashion_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     return get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, fashion=True)
 
 
-def get_CIFAR_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, colors=False):
+def get_CIFAR_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, colors=False, **kwargs):
     return get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, cifar=True, colors=colors)
 
 
-def get_MNIST_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False):
+def get_MNIST_data(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     return get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
 
@@ -103,6 +171,7 @@ def get_data(
     fashion=False,
     cifar=False,
     colors=False,
+    **kwargs,
 ):
     global sorted_X_train
     global sorted_X_test
@@ -239,30 +308,13 @@ def _test_dataset_func_time(data_func, kwargs):
 
 
 if __name__ == "__main__":
-    data_func = get_MNIST_data
+    data_func = get_simple_object
     kwargs = {
-        "CLASSES": (0, 1, 2, 8, 9),
-        "SAMPLES_PER_CLASS": 3,
+        "CLASSES": (0, 1, 2),
+        "SAMPLES_PER_CLASS": 1,
         "verbose": True,
         "test": True,
     }
 
-    print(get_max_samples_balanced(data_func, **kwargs))
-    _test_dataset_func(data_func, kwargs)
-
-    kwargs["CLASSES"] = (3, 4, 5, 6, 7)
-    print(get_max_samples_balanced(data_func, **kwargs))
-    _test_dataset_func(data_func, kwargs)
-
-    data_func = get_MNIST_fashion_data
-    print(get_max_samples_balanced(data_func, **kwargs))
-    _test_dataset_func(data_func, kwargs)
-
-    data_func = get_CIFAR_data
-    kwargs["colors"] = False
-    print(get_max_samples_balanced(data_func, **kwargs))
-    _test_dataset_func(data_func, kwargs)
-
-    kwargs["colors"] = True
-    print(get_max_samples_balanced(data_func, **kwargs))
+    # print(get_max_samples_balanced(data_func, **kwargs))
     _test_dataset_func(data_func, kwargs)

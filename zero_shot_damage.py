@@ -1,4 +1,3 @@
-import argparse
 import os
 from copy import deepcopy
 
@@ -8,7 +7,7 @@ import numpy as np
 import seaborn as sns
 from localconfig import config
 from main import evaluate_nca
-from src.data_processing import get_MNIST_data
+from src.data_processing import get_MNIST_data, get_simple_object
 from src.logger import Logger
 from src.loss import (
     global_mean_medians,
@@ -26,11 +25,15 @@ from tqdm import tqdm
 
 sns.set()
 
-NUM_DATA = 100
-N_neo = 26
+NUM_DATA = 1
+"""N_neo = 26
 M_neo = 26
-test_sizes = [0, 50, 100, 150, 200, 250, 300, 400, 500, 600, N_neo * M_neo]
+test_sizes = [0, 50, 100, 150, 200, 250, 300, 400, 500, 600, N_neo * M_neo]"""
 # test_sizes = [0, 5, 10, 15, 20, 25, 30, 35]
+
+N_neo = 16
+M_neo = 16
+test_sizes = [0, 16, 64, 128, N_neo * M_neo]
 
 
 ### Altering methods
@@ -126,10 +129,10 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_alte
             mnist_digits = eval(config.dataset.mnist_digits)
 
             moving_nca_kwargs = {
-                "size_image": (28, 28),
-                "num_classes": len(mnist_digits),
+                "size_image": (config.dataset.size, config.dataset.size),
                 "num_hidden": config.network.hidden_channels,
                 "hidden_neurons": config.network.hidden_neurons,
+                "img_channels": config.network.img_channels,
                 "iterations": config.network.iterations,
                 "position": str(config.network.position),
                 "moving": config.network.moving,
@@ -141,7 +144,7 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_alte
             # Get the data to use for all the tests on this network
             if test_data is None:
                 print("Fetching data")
-                data_func = get_MNIST_data
+                data_func = eval(config.dataset.data_func)
                 kwargs = {
                     "CLASSES": mnist_digits,
                     "SAMPLES_PER_CLASS": NUM_DATA,
@@ -149,7 +152,6 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_alte
                     "test": True,
                 }
                 test_data, target_data = data_func(**kwargs)
-                test_data = test_data.reshape(*test_data.shape, 1)
             else:
                 print("Data already loaded, continuing")
 
@@ -215,7 +217,7 @@ def get_networks_altered_score(
             to_alter_indexes,
             x_data[i],
             pixel_altering_method,
-            visualize=True if test_size == 200 and i == 0 else False,
+            visualize=True if test_size == 256 and i == 0 else False,
         )
 
         # Record Accuracy
@@ -256,24 +258,6 @@ def predict_altered(network, config, to_alter_indexes, x_data_i, pixel_altering_
     network.state[alter_index_x, alter_index_y, :] = set_to_zero(network.state[alter_index_x, alter_index_y, :])
 
     return class_predictions
-
-
-def parse_args():
-    # Parse arguments
-    parser = argparse.ArgumentParser(
-        prog="Main", description="This program runs an optimization.", epilog="Text at the bottom of help"
-    )
-    parser.add_argument("-c", "--config", type=str, help="The config file to use", default="config")
-    parser.add_argument(
-        "-p",
-        "--path",
-        type=str,
-        help="The path to the run to analyze",
-        default=None,
-    )
-
-    args = parser.parse_args()
-    return args
 
 
 def plot_average_out_circular():
@@ -346,11 +330,11 @@ def show_sampling_effect(sampling_method, pixel_altering_method):
 
 
 if __name__ == "__main__":
-    path = "experiments/current_pos_winners"
+    path = "experiments/simple_object"
     sampling_method = sample_rectangular
-    pixel_altering_method = set_to_random
+    pixel_altering_method = set_to_zero
 
-    show_sampling_effect(sampling_method, pixel_altering_method)
+    # show_sampling_effect(sampling_method, pixel_altering_method)
 
     all_scores = get_scores_for_all_subfolders(path, sampling_method, pixel_altering_method)
     plot_scores(all_scores, title="Rectangular silencing")

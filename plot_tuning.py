@@ -30,8 +30,17 @@ def get_features(path, feature1, feature2):
             if eval(f"config.{feature2}") not in feature2_list:
                 feature2_list.append(eval(f"config.{feature2}"))
 
-    feature1_list = np.sort(feature1_list)
-    feature2_list = np.sort(feature2_list)
+    try:
+        feature1_list = np.sort(feature1_list)
+    except TypeError:
+        feature1_list = np.array(feature1_list)
+        print("Trying to sort None and str I believe")
+
+    try:
+        feature2_list = np.sort(feature2_list)
+    except TypeError:
+        feature2_list = np.array(feature2_list)
+        print("Trying to sort None and str I believe")
 
     return feature1_list, feature2_list
 
@@ -67,7 +76,7 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
             for line in convergence[i][j]:
                 if len(line) < max_length:
                     max_length = len(line)
-            print(max_length)
+            print("Length data", max_length, "Feature 1", feature1_list[i], "Feature 2", feature2_list[j])
             shorter = []
             for h in convergence[i][j]:
                 shorter.append(h[:max_length])
