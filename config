@@ -2,36 +2,36 @@
 maxgen = 10
 popsize = 30
 init_sigma = 0.001
-threads = 1
+threads = 4
 pool_training = False
 stable = False
 loss = pixel_wise_CE_and_energy
 predicting_method = highest_value
 
 [SCALE]
-train_n_neo = 15
-train_m_neo = 15
-test_n_neo = 26
-test_m_neo = 26
+train_n_neo = 30
+train_m_neo = 30
+test_n_neo = 30
+test_m_neo = 30
 
 [LOGGING]
 saving_interval = 100
-plotting_interval = 50
+plotting_interval = 20
 visualize_interval = 70000
 
 [DATASET]
 mnist_digits = (0, 1, 2, 3, 4)
-samples_per_digit = 10
-data_func = get_MNIST_data
+samples_per_digit = 20
+data_func = get_CIFAR_data
 # Size only matters if data_func = get_MNIST_data_resized
-size = 28
+size = 32
 # Colors only matters if data_func = get_CIFAR_data
-colors = False
+colors = True
 
 [NETWORK]
 hidden_channels = 2
-hidden_neurons = 30
-img_channels = 1
+hidden_neurons = 50
+img_channels = 3
 iterations = 50
-moving = True
+moving = False
 position = current
