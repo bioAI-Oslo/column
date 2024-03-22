@@ -39,7 +39,7 @@ class MovingNCA(tf.keras.Model):
         self._size_active = (size_image[0] - 2, size_image[1] - 2)
 
         self.img_channels = img_channels
-        self.act_channels = 2
+        self.act_channels = 2 if moving else 0
         self.num_classes = len(mnist_digits)
         self.num_hidden = num_hidden
         self.input_dim = self.img_channels + self.num_hidden + self.num_classes
@@ -211,12 +211,19 @@ class MovingNCA(tf.keras.Model):
             if visualize:
                 images.append(copy.deepcopy(img_raw))
                 states.append(copy.deepcopy(self.state))
-                actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
+                if self.moving:
+                    actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
                 perceptions_through_time.append(copy.deepcopy(self.perceptions))
 
         if visualize:
             self.visualize(
-                images, states, actions, perceptions_through_time, self.num_hidden, self.num_classes, self.labels
+                images,
+                states,
+                actions if len(actions) != 0 else None,
+                perceptions_through_time,
+                self.num_hidden,
+                self.num_classes,
+                self.labels,
             )
 
         return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses

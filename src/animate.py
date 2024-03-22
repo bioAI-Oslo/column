@@ -33,10 +33,10 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
 
     # Converting to numpy makes indexing easier later on
     states = np.array(states)
-    actions = np.array(actions)
+    actions = np.array(actions) if actions is not None else None
 
     # Get amount of images in the horizontal direction
-    max_images_on_line = max(hidden_channels + 1 + 2, class_channels)
+    max_images_on_line = max(hidden_channels + 1 + (2 * (actions is not None)), class_channels)
 
     # Plot image
     ax_img = fig.add_subplot(2, max_images_on_line, 1)
@@ -56,13 +56,14 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
     # cb = plt.colorbar(im_hidden, ax=[ax_hidden], location="right")
 
     # Plot actions (always just 2)
-    im_action_list = []
-    for j in range(2):
-        ax_action = fig.add_subplot(2, max_images_on_line, 2 + hidden_channels + j)
-        im_action = ax_action.imshow(actions[0, :, :, j], cmap="RdBu", vmin=-0.0007, vmax=0.0007)
-        im_action_list.append(im_action)
-        ax_action.set_title("Up/Down" if j == 0 else "Left/Right")
-    # cb = plt.colorbar(im_action, ax=[ax_action], location="right")
+    if not actions is None:
+        im_action_list = []
+        for j in range(2):
+            ax_action = fig.add_subplot(2, max_images_on_line, 2 + hidden_channels + j)
+            im_action = ax_action.imshow(actions[0, :, :, j], cmap="RdBu", vmin=-0.0007, vmax=0.0007)
+            im_action_list.append(im_action)
+            ax_action.set_title("Up/Down" if j == 0 else "Left/Right")
+        # cb = plt.colorbar(im_action, ax=[ax_action], location="right")
 
     # Show class channels
     im_class_list = []
@@ -89,8 +90,9 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
         for j in range(hidden_channels):
             im_hidden_list[j].set_array(states[i, :, :, j])
 
-        for j in range(len(im_action_list)):
-            im_action_list[j].set_array(actions[i, :, :, j])
+        if not actions is None:
+            for j in range(len(im_action_list)):
+                im_action_list[j].set_array(actions[i, :, :, j])
 
         for j in range(class_channels):
             im_class_list[j].set_array(states[i, :, :, hidden_channels + j])
@@ -117,7 +119,9 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
                 )
                 last_rects[-1][-1].append(last_rect)
 
-        return [im, *im_hidden_list, *im_action_list, *im_class_list]
+        if not actions is None:
+            return [im, *im_hidden_list, *im_action_list, *im_class_list]
+        return [im, *im_hidden_list, *im_class_list]
 
     # Animate
     anim = animation.FuncAnimation(
