@@ -1,37 +1,67 @@
 [TRAINING]
-maxgen = 10
+
+maxgen = 5000
+
 popsize = 30
+
 init_sigma = 0.001
+
 threads = 4
+
 pool_training = False
+
 stable = False
+
 loss = pixel_wise_CE_and_energy
+
 predicting_method = highest_value
 
+
 [SCALE]
-train_n_neo = 30
-train_m_neo = 30
-test_n_neo = 30
-test_m_neo = 30
+
+train_n_neo = 8
+
+train_m_neo = 8
+
+test_n_neo = 16
+
+test_m_neo = 16
+
 
 [LOGGING]
+
 saving_interval = 100
-plotting_interval = 20
+
+plotting_interval = 25
+
 visualize_interval = 70000
 
+
 [DATASET]
-mnist_digits = (0, 1, 2, 3, 4)
-samples_per_digit = 20
-data_func = get_CIFAR_data
+
+mnist_digits = [0, 1, 2]
+
+samples_per_digit = 1
+
+data_func = get_simple_object
+
 # Size only matters if data_func = get_MNIST_data_resized
-size = 32
+size = 18
+
 # Colors only matters if data_func = get_CIFAR_data
-colors = True
+colors = False
+
 
 [NETWORK]
-hidden_channels = 2
-hidden_neurons = 50
-img_channels = 3
+
+hidden_channels = 1
+
+hidden_neurons = 20
+
+img_channels = 1
+
 iterations = 50
-moving = False
+
+moving = True
+
 position = current
