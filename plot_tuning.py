@@ -13,34 +13,50 @@ from src.utils import get_config
 
 sns.set()
 
+################################ GLOBALS ################################
+
+path = "./experiments/color_cifar"
+
+# Detect difference
+feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
+
 ################################ FUNCTIONS ################################
 
 
 def get_features(path, feature1, feature2):
+    """Gets lists over values the features can have"""
     feature1_list = []
     feature2_list = []
 
     for sub_folder in os.listdir(path):
         sub_path = path + "/" + sub_folder
         if os.path.isdir(sub_path):
+            # The IDE might say this isn't used, but it is in the if test below
+            # Sorry about the potentially bad code (<.<)
             config = get_config(sub_path)
 
+            # Add non-existent feature to list
             if eval(f"config.{feature1}") not in feature1_list:
                 feature1_list.append(eval(f"config.{feature1}"))
             if eval(f"config.{feature2}") not in feature2_list:
                 feature2_list.append(eval(f"config.{feature2}"))
 
+    # Sorting for nicer plotting
     try:
         feature1_list = np.sort(feature1_list)
     except TypeError:
         feature1_list = np.array(feature1_list)
-        print("Trying to sort None and str I believe")
+        print(
+            "Trying to sort None and str. If one of the features isn't str or None, don't trust the output of this script"
+        )
 
     try:
         feature2_list = np.sort(feature2_list)
     except TypeError:
         feature2_list = np.array(feature2_list)
-        print("Trying to sort None and str I believe")
+        print(
+            "Trying to sort None and str. If one of the features isn't str or None, don't trust the output of this script"
+        )
 
     return feature1_list, feature2_list
 
@@ -48,8 +64,12 @@ def get_features(path, feature1, feature2):
 def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
     plt.title(title)
     sns.heatmap(heatmap, annot=True, cmap="plasma" if not high_is_worse else "plasma_r")
+
+    # Lists should be sorted already, so this becomes pretty
     plt.yticks(np.arange(len(feature1_list)) + 0.5, feature1_list)
     plt.xticks(np.arange(len(feature2_list)) + 0.5, feature2_list)
+
+    # Prettier labels made with regex
     ylabel = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
     xlabel = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
     plt.ylabel(ylabel)
@@ -57,36 +77,38 @@ def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
 
 
 def plot_convergence_plots(convergence, title, ylabel, yticks=None):
+    # cmap and count_lines will help with color for the lines
     cmap = plt.cm.plasma
-    count_lines = 0
-    for i in range(len(feature1_list)):
-        for j in range(len(feature2_list)):
-            if convergence_loss[i][j] == []:
-                continue
-            count_lines += 1
+    count_lines = sum(1 for row in convergence for sublist in row if sublist)
 
     plt.figure()
     plt.title(title)
-    count_plotted = 0
+    count_plotted = 0  # For keeping track of which color to use
+
     for i in range(len(feature1_list)):
         for j in range(len(feature2_list)):
             if convergence[i][j] == []:
-                continue
+                continue  # Skip if there is no data
+
+            # While generating the data, runs might not be completed, and we wait until the last run is completed before plotting the full line
             max_length = np.inf
             for line in convergence[i][j]:
                 if len(line) < max_length:
                     max_length = len(line)
             print("Length data", max_length, "Feature 1", feature1_list[i], "Feature 2", feature2_list[j])
+
+            # Get the "shorter" version of each line
             shorter = []
             for h in convergence[i][j]:
                 shorter.append(h[:max_length])
+
+            # Get mean and std
             mean = np.mean(shorter, axis=0)
             std = np.std(shorter, axis=0)
 
             color = cmap(count_plotted / count_lines)
 
             plt.fill_between(x_axis[i][j][0][:max_length], mean - std, mean + std, color=color, alpha=0.5)
-
             plt.plot(
                 x_axis[i][j][0][:max_length],
                 mean,
@@ -104,6 +126,7 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
 
 
 def mean_across_inhomogeneous_dimensions(input_array: list):
+    """Mean across inhomogeneous dimensions. Numpy doesn't like to do this, so I do it myself"""
     N, M = len(input_array), len(input_array[0])
     means = np.zeros((N, M))
     for x in range(N):
@@ -114,11 +137,6 @@ def mean_across_inhomogeneous_dimensions(input_array: list):
 
 
 ######################################## HEATMAP ##########################################
-
-path = "./experiments/color_cifar"
-
-# Detect difference
-feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
 
 # Get feature 1 and feature 2
 feature1_list, feature2_list = get_features(path, feature1, feature2)
@@ -153,10 +171,10 @@ for x in range(len(feature1_list)):
     for y in range(len(feature2_list)):
         for hm in (heatmap_loss_train, heatmap_loss_test):
             if hm[x][y] == []:
-                hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Loss gets high value
+                hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Loss gets nan
         for hm in (heatmap_acc_train, heatmap_acc_test):
             if hm[x][y] == []:
-                hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Accuracy gets low value
+                hm[x][y] = [np.nan, np.nan, np.nan, np.nan]  # Accuracy gets nan
 
 # Take mean
 heatmap_loss_train = mean_across_inhomogeneous_dimensions(heatmap_loss_train)
@@ -201,7 +219,7 @@ for sub_folder in os.listdir(path):
         convergence_loss[key0][key1].append(data["training_best_loss_history"])
         convergence_acc[key0][key1].append(data["test_accuracy_train_size"])
 
-# Plt everything
+# Plot everything
 plot_convergence_plots(convergence_loss, title="Loss Convergence", ylabel="Loss")
 plot_convergence_plots(
     convergence_acc,
