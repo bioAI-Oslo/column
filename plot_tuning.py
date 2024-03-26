@@ -8,17 +8,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from localconfig import config
-from src.plotting_utils import get_plotting_data, smooth_line
+from src.plotting_utils import get_plotting_data, get_smoothing_factor, smooth_line
 from src.utils import get_config
 
 sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/color_cifar"
+path = "./experiments/simple_pattern"
 
 # Detect difference
-feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
+feature1, feature2 = "network.moving", "network.position"
 
 ################################ FUNCTIONS ################################
 
@@ -76,7 +76,7 @@ def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
     plt.xlabel(xlabel)
 
 
-def plot_convergence_plots(convergence, title, ylabel, yticks=None):
+def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=False):
     # cmap and count_lines will help with color for the lines
     cmap = plt.cm.plasma
     count_lines = sum(1 for row in convergence for sublist in row if sublist)
@@ -105,6 +105,10 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None):
             # Get mean and std
             mean = np.mean(shorter, axis=0)
             std = np.std(shorter, axis=0)
+            if smoothing:
+                smoothing_factor = get_smoothing_factor(max_length)
+                mean = smooth_line(smoothing_factor, mean)
+                std = smooth_line(smoothing_factor, std)
 
             color = cmap(count_plotted / count_lines)
 
@@ -226,6 +230,16 @@ plot_convergence_plots(
     title="Accuracy Convergence",
     ylabel="Accuracy",
     yticks=(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10)),
+)
+
+# Plot everything with smoothing
+plot_convergence_plots(convergence_loss, title="Loss Convergence Smoothed", ylabel="Loss", smoothing=True)
+plot_convergence_plots(
+    convergence_acc,
+    title="Accuracy Convergence Smoothed",
+    ylabel="Accuracy",
+    yticks=(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10)),
+    smoothing=True,
 )
 
 plt.show()
