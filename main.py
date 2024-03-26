@@ -13,6 +13,7 @@ from localconfig import config
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from src.data_processing import (
     get_CIFAR_data,
+    get_labels,
     get_MNIST_data,
     get_MNIST_data_padded,
     get_MNIST_data_resized,
@@ -159,9 +160,6 @@ def evaluate_nca(
     for sample, (img_raw, expected) in enumerate(zip(training_data, target_data)):
         if not pool_training or sample % 2 == 0:
             network.reset()
-
-        # Code further on requires a 3D image. It's not worth fixing, it takes so little time to do this
-        # img_raw = img_raw.reshape(img_raw.shape[0], img_raw.shape[1], 1)
 
         for _ in range(extra_episodes_on_digit):
             class_predictions, guesses = network.classify(img_raw, visualize=visualize and (visualized < args.vis_num))
@@ -387,7 +385,9 @@ def run_optimize(
 def parse_args():
     # Parse arguments
     parser = argparse.ArgumentParser(
-        prog="Main", description="This program runs an optimization.", epilog="Text at the bottom of help"
+        prog="Main",
+        description="This program runs an optimization.",
+        epilog="Any questions go to mia.kvalsund@gmail.com",
     )
     parser.add_argument("-c", "--config", type=str, help="The config file to use", default="config")
     parser.add_argument("-sf", "--sub_folder", type=str, help="The sub folder to use", default=None)
@@ -440,31 +440,11 @@ if __name__ == "__main__":
     # Taking specific care with the data functions
     if config.dataset.data_func == "get_MNIST_data_resized":
         kwargs["size"] = config.dataset.size
-    elif config.dataset.data_func == "get_MNIST_data_translated":
-        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        pass
-    elif config.dataset.data_func == "get_MNIST_data_padded":
-        # Size of translated data "get_MNIST_data_translated" is 70x70, specified in the function
-        pass
     elif config.dataset.data_func == "get_CIFAR_data":
-        pass
-        possibles = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
-        moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
         kwargs["colors"] = config.dataset.colors
-    elif config.dataset.data_func == "get_MNIST_fashion_data":
-        possibles = [
-            "T-shirt/top",
-            "Trouser",
-            "Pullover",
-            "Dress",
-            "Coat",
-            "Sandal",
-            "Shirt",
-            "Sneaker",
-            "Bag",
-            "Ankle boot",
-        ]
-        moving_nca_kwargs["labels"] = [possibles[i] for i in mnist_digits]
+
+    # Get labels for plotting
+    moving_nca_kwargs["labels"] = get_labels(data_func, mnist_digits)
 
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
