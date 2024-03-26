@@ -19,6 +19,14 @@ def smooth_line(filter_size, line):
     return new_line
 
 
+def get_smoothing_factor(length_list):
+    smoothing_factor = int(11 * (length_list // 50))
+    if smoothing_factor % 2 == 0:
+        smoothing_factor += 1
+
+    return smoothing_factor
+
+
 def get_plotting_data(path):
     with open(path + "/plotting_data", "r") as file:
         data = json.load(file)

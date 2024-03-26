@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import matplotlib.pyplot as plt
 import numpy as np
-from src.plotting_utils import get_plotting_data, smooth_line
+from src.plotting_utils import get_plotting_data, get_smoothing_factor, smooth_line
 
 ################################ PARSER & DATA ################################
 
@@ -22,10 +22,8 @@ data = get_plotting_data(args.path)
 x = data["x_axis"]
 
 # Calculate how much to smooth data based on resolution
-smoothing_factor = int(11 * (len(x) // 50))
-print(smoothing_factor)
-if smoothing_factor % 2 == 0:
-    smoothing_factor += 1
+smoothing_factor = get_smoothing_factor(len(x))
+print("Smoothing factor:", smoothing_factor)
 
 ################################ LOSS ################################
 
