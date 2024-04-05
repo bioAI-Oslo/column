@@ -33,3 +33,13 @@ def get_plotting_data(path):
         file.close()
 
     return data
+
+
+def get_plotting_ticks(image):
+    """I'm altering xticks and yticks for when showing the datsets because I want to show the most important info
+    which to me is the middle of the image and the image size"""
+    N, M = len(image), len(image[0])
+    xticks = [-0.5, (M // 2) - 0.5, M - 0.5], [0, M // 2, M]
+    yticks = [-0.5, (N // 2) - 0.5, N - 0.5], [0, N // 2, N]
+
+    return xticks, yticks

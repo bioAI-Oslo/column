@@ -6,6 +6,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.datasets import cifar10, fashion_mnist, mnist
+from src.plotting_utils import get_plotting_ticks
 from src.utils import shuffle, translate
 
 # Global storage of the dataset to make fetching data faster
@@ -34,6 +35,9 @@ def get_labels(data_func, classes):
             "Bag",
             "Ankle boot",
         ]
+        return [possibles[i] for i in classes]
+    elif data_func == get_simple_object:
+        possibles = ["Cup", "Knife", "Bowl"]
         return [possibles[i] for i in classes]
     else:
         return [str(i) for i in classes]
@@ -289,6 +293,28 @@ def _test_dataset_func(data_func, kwargs):
     plt.show()
 
 
+def _plot_dataset(data_func, kwargs):
+    labels = get_labels(data_func, kwargs["CLASSES"])
+    kwargs["SAMPLES_PER_CLASS"] = 1
+    X_data, y_data = data_func(**kwargs)
+
+    plt.subplots(ncols=len(labels), sharey=True, sharex=True)
+    ax = None
+    for img, lab in zip(X_data, y_data):
+        label = labels[np.argmax(lab)]
+        plt.subplot(1, len(labels), np.argmax(lab) + 1)
+        if not kwargs["colors"]:
+            plt.imshow(img, cmap="gray")
+        else:
+            plt.imshow(img)
+        plt.title("Class:" + " " + label)
+        xticks, yticks = get_plotting_ticks(img)
+        plt.xticks(xticks[0], xticks[1])
+        plt.yticks(yticks[0], yticks[1])
+
+    plt.show()
+
+
 def _test_dataset_func_time(data_func, kwargs):
     start_time = time.time()
     X_data, y_data = data_func(**kwargs)
@@ -308,13 +334,14 @@ def _test_dataset_func_time(data_func, kwargs):
 
 
 if __name__ == "__main__":
-    data_func = get_simple_object
+    data_func = get_CIFAR_data
     kwargs = {
-        "CLASSES": (0, 1, 2),
+        "CLASSES": (0, 1, 2, 3, 4),
         "SAMPLES_PER_CLASS": 1,
         "verbose": True,
         "test": True,
+        "colors": True,
     }
 
     # print(get_max_samples_balanced(data_func, **kwargs))
-    _test_dataset_func(data_func, kwargs)
+    _plot_dataset(data_func, kwargs)
