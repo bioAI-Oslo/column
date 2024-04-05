@@ -61,12 +61,27 @@ class MovingNCA(tf.keras.Model):
         self.labels = labels
 
         # Adjustable size
-        self.dmodel = tf.keras.Sequential(
+        """self.dmodel = tf.keras.Sequential(
             [
                 Dense(
                     hidden_neurons,
                     input_dim=self.input_dim * 3 * 3 + self.position_addon,
                     activation="linear",
+                ),
+                Dense(self.output_dim, activation="linear"),  # or linear
+            ]
+        )"""
+        self.dmodel = tf.keras.Sequential(
+            [
+                Dense(
+                    30,
+                    input_dim=self.input_dim * 3 * 3 + self.position_addon,
+                    activation="relu",
+                ),
+                Dense(
+                    30,
+                    input_dim=self.input_dim * 3 * 3 + self.position_addon,
+                    activation="relu",
                 ),
                 Dense(self.output_dim, activation="linear"),  # or linear
             ]
