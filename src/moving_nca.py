@@ -74,12 +74,12 @@ class MovingNCA(tf.keras.Model):
         self.dmodel = tf.keras.Sequential(
             [
                 Dense(
-                    30,
+                    hidden_neurons,
                     input_dim=self.input_dim * 3 * 3 + self.position_addon,
                     activation="relu",
                 ),
                 Dense(
-                    30,
+                    hidden_neurons,
                     input_dim=self.input_dim * 3 * 3 + self.position_addon,
                     activation="relu",
                 ),
