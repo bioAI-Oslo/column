@@ -1,6 +1,6 @@
 [TRAINING]
 
-maxgen = 5000
+maxgen = 20000
 
 popsize = 30
 
@@ -19,9 +19,9 @@ predicting_method = highest_value
 
 [SCALE]
 
-train_n_neo = 8
+train_n_neo = 16
 
-train_m_neo = 8
+train_m_neo = 16
 
 test_n_neo = 16
 
@@ -39,7 +39,7 @@ visualize_interval = 70000
 
 [DATASET]
 
-mnist_digits = [0, 1, 2]
+mnist_digits = (0, 1, 2)
 
 samples_per_digit = 1
 
@@ -54,14 +54,14 @@ colors = False
 
 [NETWORK]
 
-hidden_channels = 1
+hidden_channels = 3
 
-hidden_neurons = 20
+hidden_neurons = 10
 
 img_channels = 1
 
 iterations = 50
 
-moving = True
+moving = False
 
-position = current
+position = None
