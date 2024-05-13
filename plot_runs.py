@@ -6,7 +6,11 @@ from copy import deepcopy
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from src.plotting_utils import get_plotting_data, get_smoothing_factor, smooth_line
+from src.utils import get_config
+
+sns.set()
 
 ################################ PARSER & DATA ################################
 
@@ -62,7 +66,14 @@ plt.legend()
 
 ################################ ACCURACY ################################
 
+# Get minimum accuracy
+config = get_config(args.path)
+minim_acc = 1 / len(eval(config.dataset.mnist_digits))
+
 plt.figure()
+# First, plot minim accuracy
+plt.plot(x, [minim_acc] * len(x), label="Minimum accuracy", color="gray", linestyle="--")
+
 # Plot train accuracy first thinly, then strongly
 plt.plot(x, data["test_accuracy_train_size"], label="Train size", color="darkcyan")
 plt.plot(
