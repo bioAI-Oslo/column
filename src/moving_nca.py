@@ -98,7 +98,7 @@ class MovingNCA(tf.keras.Model):
             self.size_image[0] - 2, self.size_image[1] - 2, self.size_neo[0], self.size_neo[1]
         )
         # The internal state of the artificial neocortex needs to be reset as well
-        self.state = np.zeros((self.size_image[0], self.size_image[1], self.input_dim - self.img_channels))
+        self.state = np.zeros((self.size_neo[0] + 2, self.size_neo[1] + 2, self.input_dim - self.img_channels))
 
     def reset_batched(self, batch_size):
         """
@@ -120,7 +120,7 @@ class MovingNCA(tf.keras.Model):
 
         # The internal state of the artificial neocortex needs to be reset as well
         self.state_batched = np.zeros(
-            (batch_size, self.size_image[0], self.size_image[1], self.input_dim - self.img_channels)
+            (batch_size, self.size_neo[0] + 2, self.size_neo[1] + 2, self.input_dim - self.img_channels)
         )
 
     # @tf.function
@@ -366,7 +366,7 @@ def alter_perception_slicing_batched(perceptions_batched, actions_batched, N_neo
 
 @jit
 def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
-    N, M, _ = state.shape
+    N, M, _ = img.shape
     for x in range(N_neo):
         for y in range(M_neo):
             x_p, y_p = perceptions[x, y]
