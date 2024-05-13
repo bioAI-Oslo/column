@@ -1,4 +1,4 @@
-"""Script for plotting tuning results from the folder experiments/tuning. Should never be imported from. 
+"""Script for plotting tuning results from the folder experiments/. Should never be imported from. 
 If you want to do that, place those functions in plotting_utils.py"""
 
 import os
@@ -15,10 +15,10 @@ sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/simple_pattern"
+path = "./experiments/fashion_final10"
 
 # Detect difference
-feature1, feature2 = "network.moving", "network.position"
+feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
 
 ################################ FUNCTIONS ################################
 
@@ -113,10 +113,13 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=Fa
             color = cmap(count_plotted / count_lines)
 
             plt.fill_between(x_axis[i][j][0][:max_length], mean - std, mean + std, color=color, alpha=0.5)
+
+            feature1_name = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
+            feature2_name = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
             plt.plot(
                 x_axis[i][j][0][:max_length],
                 mean,
-                label=str(feature1_list[i]) + " " + str(feature2_list[j]),
+                label=feature1_name + ": " + str(feature1_list[i]) + " " + feature2_name + ": " + str(feature2_list[j]),
                 color=color,
             )
 
@@ -126,6 +129,46 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=Fa
         plt.yticks(yticks[0], yticks[1])
     plt.ylabel(ylabel)
     plt.xlabel("Generation")
+    plt.legend()
+
+
+def plot_convergence_plots_total(convergence, title, ylabel, yticks=None):
+    # cmap and count_lines will help with color for the lines
+    cmap = plt.cm.plasma
+    count_lines = sum(1 for row in convergence for sublist in row if sublist)
+
+    plt.figure()
+    plt.title(title)
+    count_plotted = 0  # For keeping track of which color to use
+
+    N, M = len(feature1_list), len(feature2_list)
+
+    for i in range(N):
+        for j in range(M):
+            if convergence[i][j] == []:
+                continue  # Skip if there is no data
+
+            color = cmap(count_plotted / count_lines)
+
+            plt.subplot(N, M, i * M + j + 1)
+
+            for line in convergence[i][j]:
+                plt.plot(line, color=color)
+
+            feature1_name = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
+            feature2_name = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
+
+            ax = plt.gca()
+            ax.set_title(str(feature1_list[i]) + " " + str(feature2_list[j]))
+
+            if i == N - 1:
+                ax.set_xlabel("Generation")
+            if j == 0:
+                ax.set_ylabel(ylabel)
+            if yticks is not None:
+                ax.set_yticks(yticks[0], yticks[1])
+
+            count_plotted += 1
     plt.legend()
 
 
@@ -164,11 +207,11 @@ for sub_folder in os.listdir(path):
         key1 = np.where(feature2_list == eval(f"config.{feature2}"))[0][0]
 
         # Add data to heatmap based on key
-        heatmap_loss_train[key0][key1].append(data["bestever_score_history"][-1])
-        heatmap_loss_test[key0][key1].append(data["test_loss_test_size"][-1])
+        heatmap_loss_train[key0][key1].append(np.mean(data["test_loss_train_size"][-10:]))
+        heatmap_loss_test[key0][key1].append(np.mean(data["test_loss_test_size"][-10:]))
 
-        heatmap_acc_train[key0][key1].append(data["test_accuracy_train_size"][-1])
-        heatmap_acc_test[key0][key1].append(data["test_accuracy_test_size"][-1])
+        heatmap_acc_train[key0][key1].append(np.mean(data["test_accuracy_train_size"][-10:]))
+        heatmap_acc_test[key0][key1].append(np.mean(data["test_accuracy_test_size"][-10:]))
 
 # Fill empty lists with 1 or 0 to not trip up np.mean
 for x in range(len(feature1_list)):
@@ -220,7 +263,7 @@ for sub_folder in os.listdir(path):
         x_axis[key0][key1].append(data["x_axis"])
 
         # Add the full plot to the convergence matrix
-        convergence_loss[key0][key1].append(data["training_best_loss_history"])
+        convergence_loss[key0][key1].append(data["test_loss_train_size"])
         convergence_acc[key0][key1].append(data["test_accuracy_train_size"])
 
 # Plot everything
@@ -240,6 +283,14 @@ plot_convergence_plots(
     ylabel="Accuracy",
     yticks=(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10)),
     smoothing=True,
+)
+
+plot_convergence_plots_total(convergence_loss, title="Loss Convergence All", ylabel="Loss")
+plot_convergence_plots_total(
+    convergence_acc,
+    title="Accuracy Convergence All",
+    ylabel="Accuracy",
+    yticks=(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10)),
 )
 
 plt.show()
