@@ -438,7 +438,7 @@ if __name__ == "__main__":
         "verbose": False,
     }
     # Taking specific care with the data functions
-    if config.dataset.data_func == "get_MNIST_data_resized":
+    if config.dataset.data_func == "get_MNIST_data_resized" or config.dataset.data_func == "get_simple_object":
         kwargs["size"] = config.dataset.size
     elif config.dataset.data_func == "get_CIFAR_data":
         kwargs["colors"] = config.dataset.colors
@@ -463,6 +463,8 @@ if __name__ == "__main__":
         winner_flat = Logger.load_checkpoint(args.test_path)
 
     # Get test data for new evaluation
+    # kwargs["SAMPLES_PER_CLASS"] = 800
+
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")

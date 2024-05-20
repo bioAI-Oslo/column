@@ -80,7 +80,7 @@ def get_simple_pattern(verbose=False, **kwargs):
     return training_data, target_data
 
 
-def get_simple_object(verbose=False, **kwargs):
+def get_simple_object(verbose=False, size=18, **kwargs):
     """Only for quick testing"""
 
     def mug_image_gen(N, M):
@@ -116,12 +116,22 @@ def get_simple_object(verbose=False, **kwargs):
         print("Generating moving pattern")
 
     N, M = 10, 10
-    pad_factor = 4
-    class_0 = np.pad(mug_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
-    class_1 = np.pad(knife_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
-    class_2 = np.pad(bowl_image_gen(N, M), ((pad_factor, pad_factor), (pad_factor, pad_factor), (0, 0)), "constant")
 
-    training_data = np.array([class_0, class_1, class_2])
+    cup_pattern = mug_image_gen(N, M)
+    knife_pattern = knife_image_gen(N, M)
+    bowl_pattern = bowl_image_gen(N, M)
+
+    if size > 10:
+        pad_factor = (size - 10) // 2
+        modulo = (size - 10) % 2
+
+        pad_shape = ((pad_factor, pad_factor + modulo), (pad_factor, pad_factor + modulo), (0, 0))
+
+        cup_pattern = np.pad(cup_pattern, pad_shape, "constant")
+        knife_pattern = np.pad(knife_pattern, pad_shape, "constant")
+        bowl_pattern = np.pad(bowl_pattern, pad_shape, "constant")
+
+    training_data = np.array([cup_pattern, knife_pattern, bowl_pattern])
     target_data = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32)
 
     return training_data, target_data
@@ -334,13 +344,13 @@ def _test_dataset_func_time(data_func, kwargs):
 
 
 if __name__ == "__main__":
-    data_func = get_CIFAR_data
+    data_func = get_simple_object
     kwargs = {
-        "CLASSES": (0, 1, 2, 3, 4),
+        "CLASSES": (0, 1, 2),
         "SAMPLES_PER_CLASS": 1,
         "verbose": True,
         "test": True,
-        "colors": True,
+        "colors": False,
     }
 
     # print(get_max_samples_balanced(data_func, **kwargs))
