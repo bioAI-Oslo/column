@@ -20,6 +20,7 @@ from src.data_processing import (
     get_MNIST_data_translated,
     get_MNIST_fashion_data,
     get_simple_object,
+    get_simple_object_translated,
     get_simple_pattern,
 )
 from src.logger import Logger
@@ -293,9 +294,9 @@ def run_optimize(
 
             # Evaluate each candidate solution
             if pool is None:
-                solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
+                solutions_fitness = [evaluate_nca(s, **eval_kwargs) for s in solutions]
             else:
-                jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
+                jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]
 
             # Tell es what the result was. It uses this to update its parameters
@@ -324,13 +325,13 @@ def run_optimize(
                 eval_kwargs["return_accuracy"] = True
 
                 # We don't have to change the neo size because it's already train size
-                loss_train_size, acc_train_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_train_size, acc_train_size = evaluate_nca(winner_flat, **eval_kwargs)
 
                 # Alter specific neo sizes for testing size
                 eval_kwargs["N_neo"] = config.scale.test_n_neo
                 eval_kwargs["M_neo"] = config.scale.test_m_neo
 
-                loss_test_size, acc_test_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_test_size, acc_test_size = evaluate_nca(winner_flat, **eval_kwargs)
 
                 testing_data, target_data_test = None, None
 
@@ -438,7 +439,11 @@ if __name__ == "__main__":
         "verbose": False,
     }
     # Taking specific care with the data functions
-    if config.dataset.data_func == "get_MNIST_data_resized" or config.dataset.data_func == "get_simple_object":
+    if (
+        config.dataset.data_func == "get_MNIST_data_resized"
+        or config.dataset.data_func == "get_simple_object"
+        or config.dataset.data_func == "get_simple_object_translated"
+    ):
         kwargs["size"] = config.dataset.size
     elif config.dataset.data_func == "get_CIFAR_data":
         kwargs["colors"] = config.dataset.colors

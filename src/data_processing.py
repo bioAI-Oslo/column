@@ -137,6 +137,24 @@ def get_simple_object(verbose=False, size=18, **kwargs):
     return training_data, target_data
 
 
+def get_simple_object_translated(verbose=False, SAMPLES_PER_CLASS=10, size=18, **kwargs):
+
+    # Get the OG data with 10x10
+    training_data, target_data = get_simple_object(verbose=verbose, size=10, **kwargs)
+
+    # Expand the amount to satisy the sample requirement specified by user
+    training_data = np.array([training_data[i] for _ in range(SAMPLES_PER_CLASS) for i in range(len(training_data))])
+    target_data = np.array([target_data[i] for _ in range(SAMPLES_PER_CLASS) for i in range(len(target_data))])
+
+    # Translate training set
+    training_data = translate(training_data, new_length=(size, size))
+
+    # I know it actually doesn't matter if I shuffle or not but I'd rather avoid any potential problems (f.ex. with training CNNs)
+    training_data, target_data = shuffle(training_data, target_data)
+
+    return training_data, target_data
+
+
 def get_MNIST_data_padded(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     training_data, target_data = get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
@@ -344,7 +362,7 @@ def _test_dataset_func_time(data_func, kwargs):
 
 
 if __name__ == "__main__":
-    data_func = get_simple_object
+    data_func = get_simple_object_translated
     kwargs = {
         "CLASSES": (0, 1, 2),
         "SAMPLES_PER_CLASS": 1,
@@ -352,6 +370,9 @@ if __name__ == "__main__":
         "test": True,
         "colors": False,
     }
+
+    a = data_func(**kwargs)
+    print(a[0].shape)
 
     # print(get_max_samples_balanced(data_func, **kwargs))
     _plot_dataset(data_func, kwargs)
