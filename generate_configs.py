@@ -10,8 +10,21 @@ args = parser.parse_args()
 
 config.read("config")
 
+run_script = None
+with open("run_script.sh", "r") as f:
+    run_script = f.read()
+    run_script = run_script.split("\n")
+
 for hc in args.hidden_channels:
     for hn in args.hidden_neurons:
         config.network.hidden_channels = hc
         config.network.hidden_neurons = hn
-        config.save("config" + args.name_addon + str(hc) + "_" + str(hn))
+        config_name = "config" + args.name_addon + str(hc) + "_" + str(hn)
+        config.save(config_name)
+
+        with open("run_script" + args.name_addon + str(hc) + "_" + str(hn) + ".sh", "w") as f:
+            for line in run_script:
+                if line.startswith("srun"):
+                    f.write(line + "-c " + config_name + "\n")
+                else:
+                    f.write(line + "\n")
