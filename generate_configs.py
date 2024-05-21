@@ -15,6 +15,8 @@ with open("run_script.sh", "r") as f:
     run_script = f.read()
     run_script = run_script.split("\n")
 
+collective_run_script = []
+
 for hc in args.hidden_channels:
     for hn in args.hidden_neurons:
         config.network.hidden_channels = hc
@@ -22,9 +24,16 @@ for hc in args.hidden_channels:
         config_name = "config" + args.name_addon + str(hc) + "_" + str(hn)
         config.save(config_name)
 
-        with open("run_script" + args.name_addon + str(hc) + "_" + str(hn) + ".sh", "w") as f:
+        run_script_name = "run_script" + args.name_addon + str(hc) + "_" + str(hn) + ".sh"
+        with open(run_script_name, "w") as f:
             for line in run_script:
                 if line.startswith("srun"):
                     f.write(line + "-c " + config_name + "\n")
                 else:
                     f.write(line + "\n")
+
+        collective_run_script.append(run_script_name)
+
+with open("collective_run_script.sh", "w") as f:
+    for line in collective_run_script:
+        f.write("sbatch " + line + "\n")
