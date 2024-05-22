@@ -147,7 +147,8 @@ def get_simple_object_translated(verbose=False, SAMPLES_PER_CLASS=10, size=18, *
     target_data = np.array([target_data[i] for _ in range(SAMPLES_PER_CLASS) for i in range(len(target_data))])
 
     # Translate training set
-    training_data = translate(training_data, new_length=(size, size))
+    if size > 10:
+        training_data = translate(training_data, new_length=(size, size))
 
     # I know it actually doesn't matter if I shuffle or not but I'd rather avoid any potential problems (f.ex. with training CNNs)
     training_data, target_data = shuffle(training_data, target_data)
