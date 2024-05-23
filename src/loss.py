@@ -10,8 +10,11 @@ def pixel_wise_CE_and_energy(img, guesses, expected):
 
 
 def energy(img, guesses, expected):
-    N, M = img.shape[-3:-1]
-    regulator = 225 / (N * M) * 0.0001  # Any size of cortex will yield the equivalent of 0.0001 for a 15*15 cortex
+    N, M, O = img.shape[-3:]
+    # Any size of cortex and any amount of classes will yield the equivalent of 0.0001 for a 15*15 cortex with 5 classes
+    # For historic reasons, sadly. Just consider it a fancy value instead of 0.0001
+    # regulator = 225 / (N * M) * 0.0001 # Previous regulator, used on most of the currently aquired data. Same as the one below for all 5 class data
+    regulator = 1125 / (N * M * O) * 0.0001
 
     # Batch approved
     if len(img.shape) == 4:
