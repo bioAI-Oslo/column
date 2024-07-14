@@ -156,6 +156,16 @@ def get_simple_object_translated(verbose=False, SAMPLES_PER_CLASS=10, size=18, *
     return training_data, target_data
 
 
+# Not supported anywhere
+def get_simple_object_resized(verbose=False, SAMPLES_PER_CLASS=10, size=18, **kwargs):
+    training_data, target_data = get_simple_object(verbose=verbose, size=10, **kwargs)
+
+    if size > 10:
+        training_data = np.array([cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA) for img in training_data])
+
+    return training_data, target_data
+
+
 def get_MNIST_data_padded(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, verbose=False, test=False, **kwargs):
     training_data, target_data = get_data(CLASSES, SAMPLES_PER_CLASS, verbose, test, digits=True)
 
@@ -170,7 +180,8 @@ def get_MNIST_data_resized(CLASSES=(3, 4), SAMPLES_PER_CLASS=10, size=56, verbos
 
     resized_x_data = []
     for img in training_data:
-        resized_x_data.append(cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA))
+        resized_x_data.append(cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA))  # Lost the last dimension!
+        resized_x_data[-1] = np.expand_dims(resized_x_data[-1], axis=2)
 
     return np.array(resized_x_data), target_data
 
@@ -327,6 +338,8 @@ def _plot_dataset(data_func, kwargs):
     kwargs["SAMPLES_PER_CLASS"] = 1
     X_data, y_data = data_func(**kwargs)
 
+    print("\n\n\nShapes", X_data.shape, y_data.shape, "\n\n\n")
+
     plt.subplots(ncols=len(labels), sharey=True, sharex=True)
     ax = None
     for img, lab in zip(X_data, y_data):
@@ -363,17 +376,18 @@ def _test_dataset_func_time(data_func, kwargs):
 
 
 if __name__ == "__main__":
-    data_func = get_simple_object_translated
+    np.random.seed(0)
+    random.seed(0)
+
+    data_func = get_MNIST_data_resized
     kwargs = {
-        "CLASSES": (0, 1, 2),
+        "CLASSES": (0, 1, 2, 3, 4),
         "SAMPLES_PER_CLASS": 1,
         "verbose": True,
         "test": True,
         "colors": False,
+        "size": 10,
     }
-
-    a = data_func(**kwargs)
-    print(a[0].shape)
 
     # print(get_max_samples_balanced(data_func, **kwargs))
     _plot_dataset(data_func, kwargs)
