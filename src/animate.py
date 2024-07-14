@@ -41,7 +41,7 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
     # Plot image
     ax_img = fig.add_subplot(2, max_images_on_line, 1)
     if len(images[0][0][0]) == 1:
-        im = ax_img.imshow(images[0], cmap="gray")
+        im = ax_img.imshow(images[0], cmap="RdBu", vmin=-1, vmax=1)
     else:
         im = ax_img.imshow(images[0])
     ax_img.set_title("Image")
@@ -52,7 +52,7 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
         ax_hidden = fig.add_subplot(2, max_images_on_line, 2 + j)
         im_hidden = ax_hidden.imshow(states[0, :, :, j], cmap="RdBu", vmin=-1, vmax=1)
         im_hidden_list.append(im_hidden)
-        ax_hidden.set_title("Hidden channel " + str(j + 1))
+        ax_hidden.set_title("Hidden\nchannel " + str(j + 1))
     # cb = plt.colorbar(im_hidden, ax=[ax_hidden], location="right")
 
     # Plot actions (always just 2)
