@@ -3,39 +3,42 @@ https://github.com/sidneyp/neural-cellular-robot-substrate/blob/main/src/utils.p
 For myself: If this ends up in a published repo, you need better reference and
 liscence """
 
-import json
-import pickle
 import random
-import time
 
 import numpy as np
-import tensorflow as tf
-from localconfig import config
 
 
 # Sidney's function
 def get_weights_info(weights):
     weight_shape_list = []
     for layer in weights:
-        weight_shape_list.append(tf.shape(layer))
+        weight_shape_list.append(np.shape(layer))
 
-    weight_amount_list = [tf.reduce_prod(w_shape) for w_shape in weight_shape_list]
-    weight_amount = tf.reduce_sum(weight_amount_list)
+    weight_amount_list = [np.prod(w_shape) for w_shape in weight_shape_list]
+    weight_amount = np.sum(weight_amount_list)
 
     return weight_shape_list, weight_amount_list, weight_amount
 
 
 # Sidney's function
 def get_model_weights(flat_weights, weight_amount_list, weight_shape_list):
-    split_weight = tf.split(flat_weights, weight_amount_list)
-    return [tf.reshape(split_weight[i], weight_shape_list[i]) for i in tf.range(len(weight_shape_list))]
+    # Split numpy works by splitting on indices, so I need to transform the weight amount to indices
+    transformed_weight_amount_list = [0]
+    for i in range(len(weight_amount_list)):
+        transformed_weight_amount_list.append(transformed_weight_amount_list[i] + weight_amount_list[i])
+
+    # Split
+    split_weight = np.split(flat_weights, transformed_weight_amount_list[1:-1])
+
+    # Reshape to network weights
+    return [np.reshape(split_weight[i], weight_shape_list[i]) for i in np.arange(len(weight_shape_list))]
 
 
 # Sidney's function
 def get_flat_weights(weights):
     flat_weights = []
     for layer in weights:
-        flat_weights.extend(list(layer.numpy().flatten()))
+        flat_weights.extend(list(layer.flatten()))
 
     return flat_weights
 
@@ -74,6 +77,8 @@ def add_channels_single_preexisting(img: np.ndarray, channels: np.ndarray):
 
 # Mia's function
 def get_config(path):
+    from localconfig import config
+
     config.read(path + "/config")
 
     return config
