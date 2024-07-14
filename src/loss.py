@@ -1,7 +1,6 @@
 import numpy as np
-import tensorflow as tf
-from matplotlib import pyplot as plt
-from numba import jit
+
+# import tensorflow as tf
 
 
 def pixel_wise_CE_and_energy(img, guesses, expected):
@@ -58,22 +57,23 @@ def pixel_wise_L2(img, guesses, expected):
 
 
 def pixel_wise_CE(img, guesses, expected):
+
     # Batch approved
     expected, predicted = get_expected_and_predicted(img, expected)
-    return float(
+
+    """return float(
         tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.AUTO)(
             expected, predicted
         )
-    )
-    """B, N, M, O = img.shape
-    loss = 0
-    for b in range(B):
-        loss += float(
-            tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.AUTO)(
-                expected[b * N * M : (b + 1) * N * M], predicted[b * N * M : (b + 1) * N * M]
-            )
-        )
-    return loss / len(img)"""
+    )"""
+
+    def softmax(x):
+        return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+
+    def CE(y_pred, expected):
+        return -np.sum(expected * np.log(softmax(y_pred) + 1e-10), axis=-1)
+
+    return np.mean(CE(predicted, expected))
 
 
 def global_mean_medians(img, guesses, expected):
@@ -89,11 +89,6 @@ def global_mean_medians(img, guesses, expected):
         mean_medians.append(np.mean(interval))
 
     return np.sum(((np.array(expected) - np.array(mean_medians)) ** 2))
-
-
-def scale_loss(loss, datapoints):
-    # Batch approved
-    return loss / datapoints
 
 
 def highest_value(class_images):
@@ -112,6 +107,8 @@ def highest_vote(class_images):
 
 
 if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+
     loss_to_test = pixel_wise_CE_and_energy
 
     expected = [0, 1, 0]
