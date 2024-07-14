@@ -155,7 +155,15 @@ class MovingNCA(tf.keras.Model):
             input = np.empty((B * N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
             # This function alters "input" in place
             collect_input_batched(
-                input, images_raw, self.state_batched, self.perceptions_batched, self.position, N_neo, M_neo
+                input,
+                images_raw,
+                self.state_batched,
+                self.perceptions_batched,
+                self.position,
+                N_neo,
+                M_neo,
+                N_active,
+                M_active,
             )
 
             # The output "guesses" are the state and movement
@@ -205,7 +213,7 @@ class MovingNCA(tf.keras.Model):
         guesses = None
         for _ in range(self.iterations):
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
-            collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo)
+            collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo, N_active, M_active)
 
             # guesses = tf.stop_gradient(self.dmodel(input)) # This doesn't make a difference
             guesses = self.dmodel(input)
@@ -365,7 +373,7 @@ def alter_perception_slicing_batched(perceptions_batched, actions_batched, N_neo
 
 
 @jit
-def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
+def collect_input(input, img, state, perceptions, position, N_neo, M_neo, N_active, M_active):
     N, M, _ = img.shape
     for x in range(N_neo):
         for y in range(M_neo):
@@ -378,15 +386,19 @@ def collect_input(input, img, state, perceptions, position, N_neo, M_neo):
 
             # When position is None, the input is just the perception and comms
             if position == "current":
-                input[x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
-                input[x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
-            elif position == "initial":
+                # input[x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
+                # input[x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
+                input[x * M_neo + y, -2] = (x_p / (N_active - 1)) * 2 - 1
+                input[x * M_neo + y, -1] = (y_p / (M_active - 1)) * 2 - 1
+            """elif position == "initial":
                 input[x * M_neo + y, -2] = (float(x) * N / float(N_neo) - N // 2) / (N // 2)
-                input[x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
+                input[x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)"""
 
 
 @jit
-def collect_input_batched(input, images, state_batched, perceptions_batched, position, N_neo, M_neo):
+def collect_input_batched(
+    input, images, state_batched, perceptions_batched, position, N_neo, M_neo, N_active, M_active
+):
     B, N, M, _ = images.shape
 
     for x in range(N_neo):
@@ -402,11 +414,13 @@ def collect_input_batched(input, images, state_batched, perceptions_batched, pos
 
                 # When position is None, the input is just the perception and comms
                 if position == "current":
-                    input[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
-                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
-                elif position == "initial":
+                    # input[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p - N // 2) / (N // 2)
+                    # input[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p - M // 2) / (M // 2)
+                    input[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p / (N_active - 1)) * 2 - 1
+                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p / (M_active - 1)) * 2 - 1
+                """elif position == "initial":
                     input[b * N_neo * M_neo + x * M_neo + y, -2] = (float(x) * N / float(N_neo) - N // 2) / (N // 2)
-                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)
+                    input[b * N_neo * M_neo + x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)"""
 
     # Below is the old version, almost as fast, but not quite.
     # If something is wrong with the new version, I trust this version to be correct
