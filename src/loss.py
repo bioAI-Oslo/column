@@ -56,24 +56,26 @@ def pixel_wise_L2(img, guesses, expected):
     return float(tf.keras.losses.MeanSquaredError()(expected, predicted))
 
 
+def softmax(x):
+    return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+
+
+def CE(y_pred, expected):
+    return -np.sum(expected * np.log(softmax(y_pred) + 1e-10), axis=-1)
+
+
 def pixel_wise_CE(img, guesses, expected):
 
     # Batch approved
     expected, predicted = get_expected_and_predicted(img, expected)
+
+    return np.mean(CE(predicted, expected))
 
     """return float(
         tf.keras.losses.CategoricalCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.AUTO)(
             expected, predicted
         )
     )"""
-
-    def softmax(x):
-        return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
-
-    def CE(y_pred, expected):
-        return -np.sum(expected * np.log(softmax(y_pred) + 1e-10), axis=-1)
-
-    return np.mean(CE(predicted, expected))
 
 
 def global_mean_medians(img, guesses, expected):
