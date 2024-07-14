@@ -1,12 +1,10 @@
 import os
 from copy import deepcopy
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from localconfig import config
-from main import evaluate_nca
 from src.data_processing import get_MNIST_data, get_simple_object
 from src.logger import Logger
 from src.loss import (
@@ -25,16 +23,32 @@ from tqdm import tqdm
 
 sns.set()
 
-NUM_DATA = 1
-"""N_neo = 26
-M_neo = 26
-test_sizes = [0, 50, 100, 150, 200, 250, 300, 400, 500, 600, N_neo * M_neo]"""
-# test_sizes = [0, 5, 10, 15, 20, 25, 30, 35]
 
-N_neo = 16
-M_neo = 16
-test_sizes = [0, 16, 64, 128, N_neo * M_neo]
+def alter_divisible(size_list, N_neo, M_neo):
+    new_size_list = []
+    for size in size_list:
+        if size == 0:
+            new_size_list.append(size)
+        else:
+            divisible = False
+            while divisible == False:
+                for divisor in range(2, M_neo + 1):
+                    if size % divisor == 0 and size / divisor <= N_neo:
+                        divisible = True
+                if not divisible:
+                    size += 1
+            new_size_list.append(size)
 
+    return np.array(new_size_list)
+
+
+NUM_DATA = 5
+N_neo = 15
+M_neo = 15
+test_sizes = np.round(np.array(np.linspace(0, 1, 11), dtype=float) * (N_neo * M_neo)).astype(int)
+altered = alter_divisible(test_sizes, N_neo, M_neo)
+print(altered, test_sizes)
+test_sizes = altered
 
 ### Altering methods
 
@@ -70,7 +84,7 @@ def sample_rectangular(test_size):
     if test_size == 0:
         return [], []
     random_width = np.random.choice(
-        [i for i in range(1, N_neo + 1) if test_size % i == 0 and test_size / i <= 26 and test_size / i >= 1]
+        [i for i in range(1, N_neo + 1) if test_size % i == 0 and test_size / i <= M_neo and test_size / i >= 1]
     )
     random_height = test_size // random_width
 
@@ -156,9 +170,7 @@ def get_scores_for_all_subfolders(path, silencing_method_get_indexes, pixel_alte
                 print("Data already loaded, continuing")
 
             # Load network
-            network = MovingNCA.get_instance_with(
-                winner_flat, size_neo=(config.scale.test_n_neo, config.scale.test_m_neo), **moving_nca_kwargs
-            )
+            network = MovingNCA.get_instance_with(winner_flat, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
             # Get score for this network for all test sizes
             scores_all_subpaths.append(
@@ -217,7 +229,7 @@ def get_networks_altered_score(
             to_alter_indexes,
             x_data[i],
             pixel_altering_method,
-            visualize=True if test_size == 256 and i == 0 else False,
+            visualize=True if test_size == 546 and i == 0 else False,
         )
 
         # Record Accuracy
@@ -310,9 +322,9 @@ def plot_scores(all_scores, title=None):
     ax.plot(test_sizes, all_scores[best_network], label="Best network's accuracy", color=cmap(0.5))
 
     ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
-    ax.set_xticks(test_sizes, test_sizes)
+    ax.set_xticks(test_sizes, np.round(test_sizes * 100 / (N_neo * M_neo)).astype(int))
     ax.set_ylabel("Accuracy (%)")
-    ax.set_xlabel("Nr. randomly silenced cells")
+    ax.set_xlabel("Randomly silenced cells (%)")
     if title is not None:
         ax.set_title(title)
     plt.show()
@@ -330,7 +342,7 @@ def show_sampling_effect(sampling_method, pixel_altering_method):
 
 
 if __name__ == "__main__":
-    path = "experiments/simple_object"
+    path = "experiments/mnist_final"
     sampling_method = sample_rectangular
     pixel_altering_method = set_to_zero
 

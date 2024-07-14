@@ -5,6 +5,7 @@ import os
 from copy import deepcopy
 
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -30,8 +31,10 @@ NUM_DATA = 1  # How many images to classify and visualize
 # sub_path = "experiments/current_pos_winners/3-3-24_15:58"
 # sub_path = "experiments/simple_object_moving/25-3-24_18:56"
 # sub_path = "experiments/simple_object_nonmoving/26-3-24_10:27"
-sub_path = "experiments/mnist_final/21-4-24_0:34_2"
+# sub_path = "experiments/mnist_final/21-4-24_0:34_2"
 # sub_path = "experiments/fashion_mnist/9-4-24_11:16"
+sub_path = "experiments/simple_pattern_fixed_loss/8-7-24_21:1_3"
+# sub_path = "experiments/fashion_tuning_fixed_loss/6-7-24_0:59"
 
 ############################################################################
 
@@ -80,6 +83,21 @@ def get_entropy_of_state(network):
 
     p = get_frequency_array(hidden_channels)
 
+    H = get_entropy(p[1])
+
+    return H
+
+
+def get_max_entropy(N, M, O):
+    image = np.zeros((N, M, O))
+
+    counter = 0
+    for x in range(image.shape[0]):
+        for y in range(image.shape[1]):
+            for z in range(image.shape[2]):
+                image[x, y, z] = counter
+                counter += 1
+    p = get_frequency_array(image)
     H = get_entropy(p[1])
 
     return H
@@ -134,7 +152,7 @@ def plot_frequencies_and_beliefs(
 ):
     plt.figure()
 
-    rows = 3 + len(hidden_states[0][0, 0])
+    rows = 2  # 3 + len(hidden_states[0][0, 0])
 
     # We start by plotting the original image with the fields on top for a few selected timesteps
 
@@ -170,9 +188,24 @@ def plot_frequencies_and_beliefs(
 
     # Now, under, we plot the evolution of system beliefs over time
 
+    sns.set_theme()
+    colors = [
+        "#2C2463",
+        "#DC267F",
+        "#EF792A",
+        "#D0AE3C",
+    ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
     plt.subplot(int(str(rows) + "12"))
+    counter = 0
     for line, label_i in zip(np.array(individual_beliefs).T, labels):
-        plt.plot(line / (config.scale.test_n_neo * config.scale.test_m_neo), label=label_i)
+        plt.plot(
+            line / (config.scale.test_n_neo * config.scale.test_m_neo),
+            label=label_i,
+            color=cmap((counter // 2) / max((len(labels) // 2 - 1), 1)),
+            linestyle="dashed" if counter % 2 == 0 else "solid",
+        )
+        counter += 1
 
     plt.title("Correct class is " + labels[np.argmax(y_data_i)])
     plt.yticks(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10))
@@ -180,9 +213,15 @@ def plot_frequencies_and_beliefs(
     plt.xlabel("Time steps")
     plt.legend()
 
-    plt.subplot(int(str(rows) + "13"))
+    """plt.subplot(int(str(rows) + "13"))
     plt.plot(entropy_over_time, label="Entropy")
-    plt.plot([6.516193076042965] * len(entropy_over_time), color="gray", linestyle="dashed", label="Max entropy")
+    plt.plot(
+        [get_max_entropy(hidden_states[0].shape[0], hidden_states[0].shape[1], hidden_states[0].shape[2])]
+        * len(entropy_over_time),
+        color="gray",
+        linestyle="dashed",
+        label="Max entropy",
+    )
 
     plt.title("Entropy over time")
     plt.xlabel("Time steps")
@@ -193,7 +232,7 @@ def plot_frequencies_and_beliefs(
     for i, hidden_state in enumerate(hidden_states):
         for j in range(hidden_state.shape[-1]):
             plt.subplot(rows, len(hidden_states), len(hidden_states) * (3 + j) + 1 + i)
-            plt.imshow(hidden_state[1:-1, 1:-1, j], vmax=maxx, vmin=minn)
+            plt.imshow(hidden_state[1:-1, 1:-1, j], vmax=maxx, vmin=minn)"""
 
 
 def plotting_individual_classifications():
@@ -231,22 +270,27 @@ def plotting_individual_classifications():
 if __name__ == "__main__":
     plotting_individual_classifications()
 
-    image = np.zeros((26, 26, 3))
-    p = get_frequency_array(image)
-    H = get_entropy(p[1])
+    """ents = []
+    for size in range(1, 50):
+        image = np.zeros((size, size, 3))
+        p = get_frequency_array(image)
+        H = get_entropy(p[1])
 
-    print("Homogeneous entropy:", H)
+        print("Homogeneous entropy:", H)
 
-    counter = 0
-    for x in range(image.shape[0]):
-        for y in range(image.shape[1]):
-            image[x, y, 0] = counter
-            counter += 1
-            image[x, y, 1] = counter
-            counter += 1
-            image[x, y, 2] = counter
-            counter += 1
-    p = get_frequency_array(image)
-    H = get_entropy(p[1])
+        counter = 0
+        for x in range(image.shape[0]):
+            for y in range(image.shape[1]):
+                for z in range(image.shape[2]):
+                    image[x, y, z] = counter
+                    counter += 1
+        p = get_frequency_array(image)
+        H = get_entropy(p[1])
+        print(p[1][0])
 
-    print("Noise entropy:", H)
+        ents.append(H)
+
+        print("Noise entropy:", H)
+
+    plt.plot(range(1, 50), ents)
+    plt.show()"""

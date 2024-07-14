@@ -4,6 +4,7 @@ from src.data_processing import (
     get_MNIST_data,
     get_MNIST_fashion_data,
     get_simple_object,
+    get_simple_object_translated,
     get_simple_pattern,
 )
 from src.logger import Logger
@@ -21,7 +22,7 @@ from src.moving_nca import MovingNCA
 from src.utils import get_config
 
 
-def get_network(sub_path, num_data):
+def get_network(sub_path, num_data, size_img=None):
     winner_flat = Logger.load_checkpoint(sub_path)
 
     # Also load its config
@@ -42,6 +43,9 @@ def get_network(sub_path, num_data):
         "mnist_digits": mnist_digits,
         "img_channels": config.network.img_channels,
     }
+
+    if size_img is not None:
+        moving_nca_kwargs["size_image"] = size_img
 
     data_func = eval(config.dataset.data_func)
     kwargs = {
