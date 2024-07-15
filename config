@@ -6,7 +6,7 @@ popsize = 30
 
 init_sigma = 0.001
 
-threads = 4
+threads = 6
 
 pool_training = False
 
@@ -41,9 +41,9 @@ visualize_interval = 70000
 
 mnist_digits = (0, 1, 2)
 
-samples_per_digit = 5
+samples_per_digit = 1
 
-data_func = get_simple_object_translated
+data_func = get_simple_object
 
 # Size only matters if data_func = get_MNIST_data_resized or get_simple_object or get_simple_object_translated
 size = 18
@@ -54,7 +54,7 @@ colors = False
 
 [NETWORK]
 
-hidden_channels = 1
+hidden_channels = 3
 
 hidden_neurons = 10
 
@@ -62,6 +62,6 @@ img_channels = 1
 
 iterations = 50
 
-moving = False
+moving = True
 
-position = None
+position = current
