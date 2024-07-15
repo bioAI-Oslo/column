@@ -1,55 +1,34 @@
-import argparse
-import multiprocessing as mp
-import time
-import warnings
+# Numpy uses a lot of threads when running in parallel.
+# Set OPENBLAS_NUM_THREADS=1 to avoid this
+import os
 
-import cma
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
 import numpy as np
-import tensorflow as tf
-from localconfig import config
+from src.moving_nca_no_tf import MovingNCA
 
-# Suppressing deprecation warnings from numba because it floods
-# the error logs files.
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-from src.data_processing import (
-    get_CIFAR_data,
-    get_labels,
-    get_MNIST_data,
-    get_MNIST_data_padded,
-    get_MNIST_data_resized,
-    get_MNIST_data_translated,
-    get_MNIST_fashion_data,
-    get_simple_object,
-    get_simple_object_translated,
-    get_simple_pattern,
-)
-from src.logger import Logger
-from src.loss import (
-    energy,
-    global_mean_medians,
-    highest_value,
-    highest_vote,
-    pixel_wise_CE,
-    pixel_wise_CE_and_energy,
-    pixel_wise_L2,
-    pixel_wise_L2_and_CE,
-    scale_loss,
-)
-from src.moving_nca import MovingNCA
-from src.utils import get_weights_info
+### NB!
+# Most imports are moved if __name__ == "__main__"
+# This is done because the workers spawned by multiprocessing ended up importing a bunch of stuff
+# they didn't use. This might not be a problem, but in the case of cma, simply importing cma can cause the
+# threadcount to increase by 14 (not always, setting NUM_THREADS above limits pycma).
+# I apologize for the inconvinience.
 
-warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
-warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
-# Supression part over
-
-# This is just for testing the code
+# This is for testing the code
 deterministic = False
 if deterministic:
     import random
 
+    import tensorflow as tf
+
     np.random.seed(0)
     random.seed(0)
     tf.random.set_seed(0)
+
+
+def scale_loss(loss, datapoints):
+    # Batch approved
+    return loss / datapoints
 
 
 # Evaluate one solution batched
@@ -69,16 +48,6 @@ def evaluate_nca_batch(
     stable=False,
     return_confusion=False,
 ):
-    """
-    Network creation took 0.10552453994750977 # Amounts to 26 minutes extra across 15000 gens
-    Reshape took 1.1682510375976562e-05 # Amounts to 1.5 seconds extra across 15000 gens
-    Reset took 0.04755043983459473 # Amounts to 11 minutes extra across 15000 gens
-    Classify took 0.29085350036621094 # Amounts to 1.2 hours extra across 15000 gens
-    Loss took 0.0036323070526123047 # Amounts to 54 seconds extra across 15000 gens
-    Predict took 7.152557373046875e-07
-    Eval took 0.44785308837890625 # Amounts to 1.99 hours across 15000 gens
-    """
-
     assert pool_training is False, "Batch currently does not support pool training"
     assert stable is False, "Batch currently does not support stable training"
     assert visualize is False, "Batch currently does not support visualizing"
@@ -136,14 +105,6 @@ def evaluate_nca(
     stable=False,
     return_confusion=False,
 ):
-    """
-    Network creation time: 0.015133857727050781 # Amounts to 225 seconds extra across 15000 gens
-    Scale loss time: 7.152557373046875e-07
-    Reshape time: 1.1920928955078125e-06 # Amounts to 1.5 seconds extra across 15000 gens
-    Classification time: 0.022127866744995117 # Amounts to 9.1 hours extra across 15000 gens
-    Loss time: 0.0012400150299072266 # Amounts to 30 minutes extra across 15000 gens
-    """
-
     # assert pool_training == False, "Currently does not support pool training"
     if stable:
         extra_episodes_on_digit = 5
@@ -210,6 +171,8 @@ def run_optimize(
     save=False,
     sub_folder=None,
 ):
+    import cma
+
     # Print amount of weights
     _, _, weight_amount = get_weights_info(
         MovingNCA(size_neo=(config.scale.train_n_neo, config.scale.train_m_neo), **moving_nca_kwargs).weights
@@ -221,7 +184,7 @@ def run_optimize(
     if continue_path is not None:
         init_sol = Logger.load_checkpoint(continue_path)
     else:
-        init_sol = int(weight_amount.numpy()) * [0.0]
+        init_sol = int(weight_amount) * [0.0]
 
     es = cma.CMAEvolutionStrategy(init_sol, config.training.init_sigma)  # 0.001
     if deterministic:
@@ -254,16 +217,7 @@ def run_optimize(
     bestever_score = np.inf
     bestever_weights = None
 
-    """
-    Solutions took 0.022756099700927734
-    Training data took 0.00043892860412597656
-    Evaluations took 1.0909454822540283
-    Tell took 0.0347287654876709
-    Bestever took 9.036064147949219e-05
-    Plotting took 0.5259389877319336
-    Saving took 0.006429910659790039
-    """
-
+    # Start optimization
     try:
         start_run_time = time.time()
         for g in generation_numbers:
@@ -296,8 +250,10 @@ def run_optimize(
             if pool is None:
                 solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
             else:
-                jobs = [pool.apply_async(evaluate_nca_batch, args=[s], kwds=eval_kwargs) for s in solutions]
-                solutions_fitness = [job.get() for job in jobs]
+                jobs = pool.map_async(partial(evaluate_nca_batch, **eval_kwargs), solutions)
+                solutions_fitness = jobs.get()
+                """jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
+                solutions_fitness = [job.get() for job in jobs]"""
 
             # Tell es what the result was. It uses this to update its parameters
             es.tell(solutions, solutions_fitness)
@@ -409,6 +365,49 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    import argparse
+    import multiprocessing as mp
+    import time
+    import warnings
+    from functools import partial
+
+    from localconfig import config
+
+    # Suppressing deprecation warnings from numba because it floods
+    # the error logs files.
+    from numba.core.errors import (
+        NumbaDeprecationWarning,
+        NumbaPendingDeprecationWarning,
+    )
+    from src.data_processing import (
+        get_CIFAR_data,
+        get_labels,
+        get_MNIST_data,
+        get_MNIST_data_padded,
+        get_MNIST_data_resized,
+        get_MNIST_data_translated,
+        get_MNIST_fashion_data,
+        get_simple_object,
+        get_simple_object_translated,
+        get_simple_pattern,
+    )
+    from src.logger import Logger
+    from src.loss import (
+        energy,
+        global_mean_medians,
+        highest_value,
+        highest_vote,
+        pixel_wise_CE,
+        pixel_wise_CE_and_energy,
+        pixel_wise_L2,
+        pixel_wise_L2_and_CE,
+    )
+    from src.utils import get_weights_info
+
+    warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
+    warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
+    # Supression part over
+
     # Moved to its own function because of size.
     args = parse_args()
 
@@ -473,7 +472,7 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc, conf = evaluate_nca(
+    loss, acc, conf = evaluate_nca_batch(
         winner_flat,
         training_data,
         target_data,
@@ -502,3 +501,5 @@ if __name__ == "__main__":
         plt.show()
     else:
         print(conf / (kwargs["SAMPLES_PER_CLASS"]))
+
+    print("Winner has", len(winner_flat), "parameters")
