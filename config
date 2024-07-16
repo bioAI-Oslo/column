@@ -2,11 +2,11 @@
 
 maxgen = 20000
 
-popsize = 100
+popsize = 30
 
 init_sigma = 0.001
 
-threads = 4
+threads = 10
 
 pool_training = False
 
@@ -19,13 +19,13 @@ predicting_method = highest_value
 
 [SCALE]
 
-train_n_neo = 15
+train_n_neo = 16
 
-train_m_neo = 15
+train_m_neo = 16
 
-test_n_neo = 26
+test_n_neo = 16
 
-test_m_neo = 26
+test_m_neo = 16
 
 
 [LOGGING]
@@ -39,14 +39,14 @@ visualize_interval = 70000
 
 [DATASET]
 
-mnist_digits = (0, 1, 2, 3, 4)
+mnist_digits = (0, 1, 2)
 
-samples_per_digit = 10
+samples_per_digit = 1
 
-data_func = get_MNIST_data
+data_func = get_simple_object
 
 # Size only matters if data_func = get_MNIST_data_resized or get_simple_object or get_simple_object_translated
-size = 28
+size = 18
 
 # Colors only matters if data_func = get_CIFAR_data
 colors = False
@@ -54,9 +54,9 @@ colors = False
 
 [NETWORK]
 
-hidden_channels = 2
+hidden_channels = 3
 
-hidden_neurons = 40
+hidden_neurons = 10
 
 img_channels = 1
 
