@@ -219,11 +219,13 @@ def run_optimize(
 
     # Start optimization
     try:
+        print_buffer = []
+
         start_run_time = time.time()
         for g in generation_numbers:
             start_time = time.time()
-            print()
-            print("Generation", g, flush=True)
+            print_buffer.append("")
+            print_buffer.append(f"Generation {g}")
 
             # Get candidate solutions based on CMA-ES internal parameters
             solutions = es.ask(number=config.training.popsize)  # , sigma_fac=(((MAXGEN-g)/MAXGEN)*0.9)+0.1)
@@ -301,7 +303,7 @@ def run_optimize(
                         bestever_score,
                     )
 
-                print("Accuries are train:", acc_train_size, "Test:", acc_test_size, flush=True)
+                print_buffer.append(f"Accuries are train: {acc_train_size} Test: {acc_test_size}")
             # Plotting and visualization ends here
 
             # Do we need to save a little bit of data?
@@ -311,11 +313,17 @@ def run_optimize(
                 logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
                 logger_object.save_plotting_data()
 
+                to_print = ""
+                for print_line in print_buffer:
+                    to_print += print_line + "\n"
+                print(to_print, flush=True)
+                print_buffer.clear()
+
             # Display results
-            print("Current best score:", np.min(solutions_fitness), flush=True)
-            print("Bestever score:", bestever_score, flush=True)
+            print_buffer.append(f"Current best score: {np.min(solutions_fitness)}")
+            print_buffer.append(f"Bestever score: {bestever_score}")
             end_time = time.time()
-            print("Generation time:", end_time - start_time, "seconds", flush=True)
+            print_buffer.append(f"Generation time: {end_time - start_time} seconds")
 
         end_run_time = time.time()
         print("The entire run took", end_run_time - start_run_time, "seconds")
@@ -472,7 +480,7 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc, conf = evaluate_nca_batch(
+    loss, acc, conf = evaluate_nca(
         winner_flat,
         training_data,
         target_data,
