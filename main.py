@@ -316,7 +316,7 @@ def run_optimize(
                 to_print = ""
                 for print_line in print_buffer:
                     to_print += print_line + "\n"
-                print(to_print, flush=True)
+                print(to_print)
                 print_buffer.clear()
 
             # Display results
