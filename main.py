@@ -223,12 +223,12 @@ def run_optimize(
 
         start_run_time = time.time()
         for g in generation_numbers:
-            start_time = time.time()
+            start_gen_time = time.time()
             print_buffer.append("")
             print_buffer.append(f"Generation {g}")
 
             # Get candidate solutions based on CMA-ES internal parameters
-            solutions = es.ask(number=config.training.popsize)  # , sigma_fac=(((MAXGEN-g)/MAXGEN)*0.9)+0.1)
+            solutions = es.ask(number=config.training.popsize, sigma_fac=1)  # , sigma_fac=0.9999
 
             # Generate training data for evaluating each candidate solution
             training_data, target_data = data_func(**data_kwargs)
@@ -313,17 +313,19 @@ def run_optimize(
                 logger_object.save_checkpoint(bestever_weights, filename="bestever_network")
                 logger_object.save_plotting_data()
 
+            # Buffer results
+            print_buffer.append(f"Current best score: {np.min(solutions_fitness)}")
+            print_buffer.append(f"Bestever score: {bestever_score}")
+            end_gen_time = time.time()
+            print_buffer.append(f"Generation time: {end_gen_time - start_gen_time} seconds")
+
+            # Empty buffer?
+            if not save or (save and g % config.logging.saving_interval == 0):
                 to_print = ""
                 for print_line in print_buffer:
                     to_print += print_line + "\n"
                 print(to_print)
                 print_buffer.clear()
-
-            # Display results
-            print_buffer.append(f"Current best score: {np.min(solutions_fitness)}")
-            print_buffer.append(f"Bestever score: {bestever_score}")
-            end_time = time.time()
-            print_buffer.append(f"Generation time: {end_time - start_time} seconds")
 
         end_run_time = time.time()
         print("The entire run took", end_run_time - start_run_time, "seconds")
