@@ -438,6 +438,7 @@ if __name__ == "__main__":
         "moving": config.network.moving,
         "mnist_digits": mnist_digits,
         "labels": mnist_digits,
+        "activation": config.network.activation_function,
     }
 
     # Data function and kwargs

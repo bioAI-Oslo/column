@@ -4,6 +4,22 @@ from src.perception_matrix import get_perception_matrix
 from src.utils import get_model_weights
 
 
+def relu(x):
+    return np.maximum(0, x)
+
+
+def linear(x):
+    return x
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def tanh(x):
+    return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+
 class MovingNCA:
     def __init__(
         self,
@@ -17,6 +33,7 @@ class MovingNCA:
         moving=True,
         mnist_digits=(0, 3, 4),
         labels=None,
+        activation=None,
     ):
 
         if size_image is None:
@@ -33,6 +50,8 @@ class MovingNCA:
         self.input_dim = self.img_channels + self.num_hidden + self.num_classes
         self.output_dim = self.num_hidden + self.num_classes + self.act_channels
 
+        self.activation = eval(activation) if activation is not None else linear
+
         self.iterations = iterations
         self.moving = moving
         self.position = position
@@ -47,7 +66,7 @@ class MovingNCA:
         self.layer2 = np.zeros((hidden_neurons, self.output_dim))
         self.bias2 = np.zeros((self.output_dim))
         self.weights = [self.layer1, self.bias1, self.layer2, self.bias2]
-        self.dmodel = lambda x: (x @ self.layer1 + self.bias1) @ self.layer2 + self.bias2
+        self.create_model()
 
     def reset(self):
         """
@@ -163,9 +182,6 @@ class MovingNCA:
 
         if visualize:
             import copy
-            import multiprocessing as mp
-
-            from src.animate import animate
 
             images = []
             states = []
@@ -221,6 +237,10 @@ class MovingNCA:
         # It's slower, however the animate function spawns many objects and leads to memory leaks. By using the
         # function in a new process, all objects should be cleaned up at close and the animate function
         # can be used as many times as wanted
+        import multiprocessing as mp
+
+        from src.animate import animate
+
         p = mp.Process(
             target=animate,
             args=(images, states, actions, perceptions_through_time, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS),
@@ -243,6 +263,7 @@ class MovingNCA:
         moving=True,
         mnist_digits=(0, 3, 4),
         labels=None,
+        activation=None,
     ):
         network = MovingNCA(
             num_hidden=num_hidden,
@@ -255,6 +276,7 @@ class MovingNCA:
             moving=moving,
             mnist_digits=mnist_digits,
             labels=labels,
+            activation=activation,
         )
 
         network.set_weights(flat_weights)
@@ -279,9 +301,12 @@ class MovingNCA:
         self.layer2 = shaped_weight[2]
         self.bias2 = shaped_weight[3]
 
-        self.dmodel = lambda x: (x @ self.layer1 + self.bias1) @ self.layer2 + self.bias2
+        self.create_model()
 
         return None  # Why does it explicitly return None?
+
+    def create_model(self):
+        self.dmodel = lambda x: self.activation(x @ self.layer1 + self.bias1) @ self.layer2 + self.bias2
 
 
 def custom_round_slicing(x: list):
