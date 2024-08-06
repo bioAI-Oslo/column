@@ -4,20 +4,29 @@ from src.perception_matrix import get_perception_matrix
 from src.utils import get_model_weights
 
 
+@jit
 def relu(x):
     return np.maximum(0, x)
 
 
+@jit
 def linear(x):
     return x
 
 
+@jit
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+@jit
 def tanh(x):
     return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+
+@jit
+def layer_math(x, weight, bias):
+    return x @ weight + bias
 
 
 class MovingNCA:
@@ -60,12 +69,28 @@ class MovingNCA:
         self.mnist_digits = mnist_digits
         self.labels = labels
 
-        # Adjustable size
-        self.layer1 = np.zeros((self.input_dim * 3 * 3 + self.position_addon, hidden_neurons))
-        self.bias1 = np.zeros((hidden_neurons))
-        self.layer2 = np.zeros((hidden_neurons, self.output_dim))
-        self.bias2 = np.zeros((self.output_dim))
-        self.weights = [self.layer1, self.bias1, self.layer2, self.bias2]
+        # Make the weight shape list. Init with the input layer
+        self.weight_shape_list = [
+            (self.input_dim * 3 * 3 + self.position_addon, hidden_neurons[0]),
+            (hidden_neurons[0]),
+        ]
+        # Add the hidden layers
+        for i in range(1, len(hidden_neurons)):
+            self.weight_shape_list.append((hidden_neurons[i - 1], hidden_neurons[i]))  # weight
+            self.weight_shape_list.append((hidden_neurons[i]))  # bias
+
+        # Add the output layer
+        self.weight_shape_list.append((hidden_neurons[-1], self.output_dim))
+        self.weight_shape_list.append((self.output_dim))
+
+        # Init the weights and the weight amounts list
+        self.weights = []
+        self.weight_amount_list = []
+        for shape in self.weight_shape_list:
+            self.weights.append(np.zeros(shape))
+            self.weight_amount_list.append(self.weights[-1].size)
+
+        # This creates a model with the weights above
         self.create_model()
 
     def reset(self):
@@ -283,30 +308,21 @@ class MovingNCA:
         return network
 
     def set_weights(self, flat_weights):
-        weight_shape_list, weight_amount_list = [
-            self.layer1.shape,
-            self.bias1.shape,
-            self.layer2.shape,
-            self.bias2.shape,
-        ], [
-            self.layer1.size,
-            self.bias1.size,
-            self.layer2.size,
-            self.bias2.size,
-        ]
-        shaped_weight = get_model_weights(flat_weights, weight_amount_list, weight_shape_list)
-
-        self.layer1 = shaped_weight[0]
-        self.bias1 = shaped_weight[1]
-        self.layer2 = shaped_weight[2]
-        self.bias2 = shaped_weight[3]
+        self.weights = get_model_weights(flat_weights, self.weight_amount_list, self.weight_shape_list)
 
         self.create_model()
 
-        return None  # Why does it explicitly return None?
-
     def create_model(self):
-        self.dmodel = lambda x: self.activation(x @ self.layer1 + self.bias1) @ self.layer2 + self.bias2
+
+        # Func is a feed forward network that takes input x and returns output y
+        def func(x):
+            res = x
+            for i in range(0, len(self.weights) - 2, 2):
+                res = self.activation(layer_math(res, self.weights[i], self.weights[i + 1]))
+
+            return layer_math(res, self.weights[-2], self.weights[-1])
+
+        self.dmodel = func
 
 
 def custom_round_slicing(x: list):

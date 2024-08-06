@@ -426,12 +426,17 @@ if __name__ == "__main__":
     mnist_digits = eval(config.dataset.mnist_digits)
     loss_function = eval(config.training.loss)
     predicting_method = eval(config.training.predicting_method)
+    hidden_neurons = (
+        eval(config.network.hidden_neurons)
+        if type(config.network.hidden_neurons) != int
+        else [config.network.hidden_neurons]
+    )
 
     # This parameter dictionary will be used for all instances of the network
     moving_nca_kwargs = {
         "size_image": (config.dataset.size, config.dataset.size),
         "num_hidden": config.network.hidden_channels,
-        "hidden_neurons": config.network.hidden_neurons,
+        "hidden_neurons": hidden_neurons,
         "img_channels": config.network.img_channels,
         "iterations": config.network.iterations,
         "position": str(config.network.position),
@@ -493,8 +498,8 @@ if __name__ == "__main__":
         verbose=False,
         visualize=args.visualize,
         return_accuracy=True,
-        N_neo=config.scale.test_n_neo,
-        M_neo=config.scale.test_m_neo,
+        N_neo=config.scale.train_n_neo,
+        M_neo=config.scale.train_m_neo,
         return_confusion=True,
         pool_training=config.training.pool_training,
         stable=config.training.stable,
