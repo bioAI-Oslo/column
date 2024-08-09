@@ -228,7 +228,7 @@ def run_optimize(
             print_buffer.append(f"Generation {g}")
 
             # Get candidate solutions based on CMA-ES internal parameters
-            solutions = es.ask(number=config.training.popsize, sigma_fac=1)  # , sigma_fac=0.9999
+            solutions = es.ask(number=config.training.popsize)  # , sigma_fac=0.9999
 
             # Generate training data for evaluating each candidate solution
             training_data, target_data = data_func(**data_kwargs)
