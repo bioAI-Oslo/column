@@ -3,17 +3,17 @@ import numpy as np
 # import tensorflow as tf
 
 
-def pixel_wise_CE_and_energy(img, guesses, expected):
+def pixel_wise_CE_and_energy(img, guesses, expected, lambda_energy=0.0001):
     # Batch approved
-    return pixel_wise_CE(img, guesses, expected) + energy(img, guesses, expected)
+    return pixel_wise_CE(img, guesses, expected) + energy(img, guesses, expected, lambda_energy)
 
 
-def energy(img, guesses, expected):
+def energy(img, guesses, expected, lambda_energy=0.0001):
     N, M, O = img.shape[-3:]
     # Any size of cortex and any amount of classes will yield the equivalent of 0.0001 for a 15*15 cortex with 5 classes
     # For historic reasons, sadly. Just consider it a fancy value instead of 0.0001
     # regulator = 225 / (N * M) * 0.0001 # Previous regulator, used on most of the currently aquired data. Same as the one below for all 5 class data
-    regulator = 1125 / (N * M * O) * 0.0001
+    regulator = 1125 / (N * M * O) * lambda_energy
 
     # Batch approved
     if len(img.shape) == 4:
