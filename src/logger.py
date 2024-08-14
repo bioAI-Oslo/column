@@ -145,7 +145,7 @@ class Logger(LoggerBase):
     def load_checkpoint(path):
         best_solution = None
 
-        with open(path + "/bestever_network", "r") as file:
+        with open(path + "/best_network", "r") as file:
             best_solution = json.loads(file.read())
             file.close()
 
