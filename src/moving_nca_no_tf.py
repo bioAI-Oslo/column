@@ -24,7 +24,7 @@ def tanh(x):
     return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
 
 
-@njit
+@jit
 def layer_math(x, weight, bias):
     return x @ weight + bias
 
