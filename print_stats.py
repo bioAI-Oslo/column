@@ -5,7 +5,7 @@ import os
 
 import numpy as np
 from common_funcs import get_network
-from main import evaluate_nca_batch
+from main import evaluate_nca_batch, get_from_config
 from src.data_processing import (
     get_CIFAR_data,
     get_labels,
@@ -25,7 +25,6 @@ from src.loss import (
     pixel_wise_CE_and_energy,
     pixel_wise_L2,
     pixel_wise_L2_and_CE,
-    scale_loss,
 )
 from src.moving_nca import MovingNCA
 from src.utils import get_config
@@ -35,29 +34,9 @@ def get_performance(sub_path, config, test_data_used=False, num_data=None):
     winner_flat = Logger.load_checkpoint(sub_path)
 
     # Fetch info from config and enable environment for testing
-    mnist_digits = eval(config.dataset.mnist_digits)
-    predicting_method = eval(config.training.predicting_method)
-    loss_function = eval(config.training.loss)
+    moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
-    moving_nca_kwargs = {
-        "size_image": (config.dataset.size, config.dataset.size),
-        "num_hidden": config.network.hidden_channels,
-        "hidden_neurons": config.network.hidden_neurons,
-        "iterations": config.network.iterations,
-        "position": str(config.network.position),
-        "moving": config.network.moving,
-        "mnist_digits": mnist_digits,
-        "img_channels": config.network.img_channels,
-    }
-
-    data_func = eval(config.dataset.data_func)
-    kwargs = {
-        "CLASSES": mnist_digits,
-        "SAMPLES_PER_CLASS": 1,
-        "verbose": False,
-        "test": test_data_used,
-        "colors": True if config.network.img_channels == 3 else False,
-    }
+    kwargs["test"] = test_data_used
 
     if num_data is None:
         num_data = get_max_samples_balanced(data_func, **kwargs)
