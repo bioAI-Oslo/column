@@ -1,30 +1,30 @@
 import numpy as np
-from numba import jit
+from numba import jit, njit
 from src.perception_matrix import get_perception_matrix
 from src.utils import get_model_weights
 
 
-@jit
+@njit
 def relu(x):
     return np.maximum(0, x)
 
 
-@jit
+@njit
 def linear(x):
     return x
 
 
-@jit
+@njit
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-@jit
+@njit
 def tanh(x):
     return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
 
 
-@jit
+@njit
 def layer_math(x, weight, bias):
     return x @ weight + bias
 
@@ -351,7 +351,7 @@ def custom_round_slicing(x: list):
     return x_new
 
 
-@jit
+@njit
 def clipping(array, N, M):
     # This function clips the values in the array to the range [0, N]
     # It alters the array in place
@@ -372,7 +372,7 @@ def alter_perception_slicing(perceptions, actions, N_neo, M_neo, N_active, M_act
     add_action_slicing(perceptions, actions, N_active, M_active)
 
 
-@jit
+@njit
 def clipping_batched(array, N, M):
     # This function clips the values in the array to the range [0, N]
     # It alters the array in place
@@ -394,7 +394,7 @@ def alter_perception_slicing_batched(perceptions_batched, actions_batched, N_neo
     add_action_slicing_batched(perceptions_batched, actions_batched, N_active, M_active)
 
 
-@jit
+@njit
 def collect_input(input, img, state, perceptions, position, N_neo, M_neo, N_active, M_active):
     for x in range(N_neo):
         for y in range(M_neo):
@@ -416,7 +416,7 @@ def collect_input(input, img, state, perceptions, position, N_neo, M_neo, N_acti
                 input[x * M_neo + y, -1] = (float(y) * M / float(M_neo) - M // 2) / (M // 2)"""
 
 
-@jit
+@njit
 def collect_input_batched(
     input, images, state_batched, perceptions_batched, position, N_neo, M_neo, N_active, M_active
 ):
