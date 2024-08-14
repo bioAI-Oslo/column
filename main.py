@@ -26,6 +26,82 @@ if deterministic:
     tf.random.set_seed(0)
 
 
+def get_from_config(config):
+    from src.data_processing import (
+        get_CIFAR_data,
+        get_labels,
+        get_MNIST_data,
+        get_MNIST_data_padded,
+        get_MNIST_data_resized,
+        get_MNIST_data_translated,
+        get_MNIST_fashion_data,
+        get_simple_object,
+        get_simple_object_translated,
+        get_simple_pattern,
+    )
+    from src.loss import (
+        energy,
+        global_mean_medians,
+        highest_value,
+        highest_vote,
+        pixel_wise_CE,
+        pixel_wise_CE_and_energy,
+        pixel_wise_L2,
+        pixel_wise_L2_and_CE,
+    )
+
+    mnist_digits = eval(config.dataset.mnist_digits)
+    predicting_method = eval(config.training.predicting_method)
+    hidden_neurons = (
+        eval(config.network.hidden_neurons)
+        if type(config.network.hidden_neurons) != int
+        else [config.network.hidden_neurons]
+    )
+
+    # Dealing with loss
+    loss_function = eval(config.training.loss)
+    if config.training.lambda_energy is not None:
+        lambda_energy = float(config.training.lambda_energy)
+        # This is kind of ugly, but at this point I didn't want to mess with the code more than this
+        loss_function = partial(loss_function, lambda_energy=lambda_energy)
+
+    # This parameter dictionary will be used for all instances of the network
+    moving_nca_kwargs = {
+        "size_image": (config.dataset.size, config.dataset.size),
+        "num_hidden": config.network.hidden_channels,
+        "hidden_neurons": hidden_neurons,
+        "img_channels": config.network.img_channels,
+        "iterations": config.network.iterations,
+        "position": str(config.network.position),
+        "moving": config.network.moving,
+        "mnist_digits": mnist_digits,
+        "labels": mnist_digits,
+        "activation": config.network.activation_function,
+    }
+
+    # Data function and kwargs
+    data_func = eval(config.dataset.data_func)
+    kwargs = {
+        "CLASSES": mnist_digits,
+        "SAMPLES_PER_CLASS": config.dataset.samples_per_digit,
+        "verbose": False,
+    }
+    # Taking specific care with the data functions
+    if (
+        config.dataset.data_func == "get_MNIST_data_resized"
+        or config.dataset.data_func == "get_simple_object"
+        or config.dataset.data_func == "get_simple_object_translated"
+    ):
+        kwargs["size"] = config.dataset.size
+    elif config.dataset.data_func == "get_CIFAR_data":
+        kwargs["colors"] = config.dataset.colors
+
+    # Get labels for plotting
+    moving_nca_kwargs["labels"] = get_labels(data_func, mnist_digits)
+
+    return moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs
+
+
 def scale_loss(loss, datapoints):
     # Batch approved
     return loss / datapoints
@@ -423,48 +499,8 @@ if __name__ == "__main__":
 
     # Read config
     config.read(args.config)
-    mnist_digits = eval(config.dataset.mnist_digits)
-    loss_function = eval(config.training.loss)
-    predicting_method = eval(config.training.predicting_method)
-    hidden_neurons = (
-        eval(config.network.hidden_neurons)
-        if type(config.network.hidden_neurons) != int
-        else [config.network.hidden_neurons]
-    )
 
-    # This parameter dictionary will be used for all instances of the network
-    moving_nca_kwargs = {
-        "size_image": (config.dataset.size, config.dataset.size),
-        "num_hidden": config.network.hidden_channels,
-        "hidden_neurons": hidden_neurons,
-        "img_channels": config.network.img_channels,
-        "iterations": config.network.iterations,
-        "position": str(config.network.position),
-        "moving": config.network.moving,
-        "mnist_digits": mnist_digits,
-        "labels": mnist_digits,
-        "activation": config.network.activation_function,
-    }
-
-    # Data function and kwargs
-    data_func = eval(config.dataset.data_func)
-    kwargs = {
-        "CLASSES": mnist_digits,
-        "SAMPLES_PER_CLASS": config.dataset.samples_per_digit,
-        "verbose": False,
-    }
-    # Taking specific care with the data functions
-    if (
-        config.dataset.data_func == "get_MNIST_data_resized"
-        or config.dataset.data_func == "get_simple_object"
-        or config.dataset.data_func == "get_simple_object_translated"
-    ):
-        kwargs["size"] = config.dataset.size
-    elif config.dataset.data_func == "get_CIFAR_data":
-        kwargs["colors"] = config.dataset.colors
-
-    # Get labels for plotting
-    moving_nca_kwargs["labels"] = get_labels(data_func, mnist_digits)
+    moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
