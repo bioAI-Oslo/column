@@ -4,6 +4,8 @@ If you want to do that, place those functions in plotting_utils.py"""
 import os
 import re
 
+import cmcrameri.cm as cmc
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -15,12 +17,26 @@ sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/fashion_final10"
+path = "./experiments/mnist10_one_network"
 
 # Detect difference
-feature1, feature2 = "network.hidden_channels", "network.hidden_neurons"
+feature1, feature2 = "scale.train_n_neo", "network.hidden_neurons"
 
 ################################ FUNCTIONS ################################
+
+
+def sort_features(feature_list):
+    print(feature_list)
+    try:
+        feature_list = np.sort(feature_list)
+    except TypeError:
+        feature_list = np.array(feature_list)
+        print(
+            "Trying to sort None and str. If one of the features isn't str or None, don't trust the output of this script"
+        )
+
+    print(feature_list)
+    return feature_list
 
 
 def get_features(path, feature1, feature2):
@@ -36,34 +52,37 @@ def get_features(path, feature1, feature2):
             config = get_config(sub_path)
 
             # Add non-existent feature to list
-            if eval(f"config.{feature1}") not in feature1_list:
-                feature1_list.append(eval(f"config.{feature1}"))
-            if eval(f"config.{feature2}") not in feature2_list:
-                feature2_list.append(eval(f"config.{feature2}"))
+            feature1_eval = eval(f"config.{feature1}")
+            feature2_eval = eval(f"config.{feature2}")
+
+            if feature1_eval not in feature1_list:
+                feature1_list.append(feature1_eval)
+
+            if feature2_eval not in feature2_list:
+                feature2_list.append(feature2_eval)
 
     # Sorting for nicer plotting
-    try:
-        feature1_list = np.sort(feature1_list)
-    except TypeError:
-        feature1_list = np.array(feature1_list)
-        print(
-            "Trying to sort None and str. If one of the features isn't str or None, don't trust the output of this script"
-        )
-
-    try:
-        feature2_list = np.sort(feature2_list)
-    except TypeError:
-        feature2_list = np.array(feature2_list)
-        print(
-            "Trying to sort None and str. If one of the features isn't str or None, don't trust the output of this script"
-        )
+    feature1_list = sort_features(feature1_list)
+    feature2_list = sort_features(feature2_list)
 
     return feature1_list, feature2_list
 
 
 def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
     plt.title(title)
-    sns.heatmap(heatmap, annot=True, cmap="plasma" if not high_is_worse else "plasma_r")
+    colors = [
+        "#2C2463",
+        "#DC267F",
+        "#EF792A",
+        "#FFD958",
+    ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
+    if high_is_worse:
+        colors.reverse()
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
+    if high_is_worse:
+        sns.heatmap(heatmap, annot=True, cmap=cmap, square=True)
+    else:
+        sns.heatmap(heatmap, annot=True, cmap=cmap, square=True, vmin=0, vmax=1)
 
     # Lists should be sorted already, so this becomes pretty
     plt.yticks(np.arange(len(feature1_list)) + 0.5, feature1_list)
@@ -78,7 +97,14 @@ def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
 
 def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=False):
     # cmap and count_lines will help with color for the lines
-    cmap = plt.cm.plasma
+    # cmap = plt.cm.plasma
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+        "", ["#7597FF", "#6A52DC", "#DC267F", "#FFB000"]
+    )  # Modified IBM design library palette
+    """cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+        "", colors=["#32239C", "#DC267F", "#EF6337", "#F3B320"]
+    )  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)"""
+
     count_lines = sum(1 for row in convergence for sublist in row if sublist)
 
     plt.figure()
@@ -110,7 +136,13 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=Fa
                 mean = smooth_line(smoothing_factor, mean)
                 std = smooth_line(smoothing_factor, std)
 
-            color = cmap(count_plotted / count_lines)
+            color = cmap(0.5 if count_lines == 1 else count_plotted / (count_lines - 1))
+            print(feature1, feature2, type(feature1_list[i]), type(feature2_list[j]))
+            if feature1 == "network.moving" and feature2 == "network.position":
+                print("We're here")
+                cmap_pos = 2 if feature1_list[i] == True else 0
+                cmap_pos += 1 if feature2_list[j] == None else 0
+                color = cmap(cmap_pos / 3)
 
             plt.fill_between(x_axis[i][j][0][:max_length], mean - std, mean + std, color=color, alpha=0.5)
 
@@ -183,6 +215,23 @@ def mean_across_inhomogeneous_dimensions(input_array: list):
     return means
 
 
+def get_keys(feature1, feature2, feature1_list, feature2_list):
+    def get_key(feature, feature_list):
+        feature_eval = eval(f"config.{feature}")
+        print(feature_eval)
+        if type(feature_eval) not in [str, int, float, list]:
+            return np.where(feature_list == str(feature_eval))[0][0]
+        else:
+            if feature_eval not in feature_list:
+                return np.where(feature_list == str(feature_eval))[0][0]
+            return np.where(feature_list == feature_eval)[0][0]
+
+    key0 = get_key(feature1, feature1_list)
+    key1 = get_key(feature2, feature2_list)
+
+    return key0, key1
+
+
 ######################################## HEATMAP ##########################################
 
 # Get feature 1 and feature 2
@@ -203,8 +252,7 @@ for sub_folder in os.listdir(path):
         config = get_config(sub_path)
 
         # Key in heatmap based on ordered feature 1 and feature 2
-        key0 = np.where(feature1_list == eval(f"config.{feature1}"))[0][0]
-        key1 = np.where(feature2_list == eval(f"config.{feature2}"))[0][0]
+        key0, key1 = get_keys(feature1, feature2, feature1_list, feature2_list)
 
         # Add data to heatmap based on key
         heatmap_loss_train[key0][key1].append(np.mean(data["test_loss_train_size"][-10:]))
@@ -256,9 +304,8 @@ for sub_folder in os.listdir(path):
         data = get_plotting_data(sub_path)
         config = get_config(sub_path)
 
-        # Same as before
-        key0 = np.where(feature1_list == eval(f"config.{feature1}"))[0][0]
-        key1 = np.where(feature2_list == eval(f"config.{feature2}"))[0][0]
+        # Key in heatmap based on ordered feature 1 and feature 2
+        key0, key1 = get_keys(feature1, feature2, feature1_list, feature2_list)
 
         x_axis[key0][key1].append(data["x_axis"])
 
