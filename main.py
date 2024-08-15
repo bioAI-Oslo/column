@@ -124,10 +124,6 @@ def evaluate_nca_batch(
     stable=False,
     return_confusion=False,
 ):
-    assert pool_training is False, "Batch currently does not support pool training"
-    assert stable is False, "Batch currently does not support stable training"
-    assert visualize is False, "Batch currently does not support visualizing"
-
     # Getting network
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
@@ -181,11 +177,10 @@ def evaluate_nca(
     stable=False,
     return_confusion=False,
 ):
-    # assert pool_training == False, "Currently does not support pool training"
     if stable:
-        extra_episodes_on_digit = 5
+        steps = moving_nca_kwargs["iterations"]
     else:
-        extra_episodes_on_digit = 1
+        steps = 1
 
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
@@ -199,10 +194,12 @@ def evaluate_nca(
         if not pool_training or sample % 2 == 0:
             network.reset()
 
-        for _ in range(extra_episodes_on_digit):
-            class_predictions, guesses = network.classify(img_raw, visualize=visualize and (visualized < args.vis_num))
+        for step in range(steps):
+            class_predictions, guesses = network.classify(
+                img_raw, visualize=visualize and (visualized < args.vis_num), step=step if stable else None
+            )
 
-            if visualize and (visualized < args.vis_num):
+            if visualize and (visualized < args.vis_num) and step == steps - 1:
                 visualized += 1
 
             loss += loss_function(class_predictions, guesses, expected)
@@ -219,14 +216,14 @@ def evaluate_nca(
                     conf_matrix[actual, believed] += 1
 
     if return_accuracy:
-        accuracy /= training_data.shape[0] * extra_episodes_on_digit
+        accuracy /= training_data.shape[0] * steps
     if return_confusion:
-        conf_matrix /= extra_episodes_on_digit
+        conf_matrix /= steps
 
     if verbose:
         print("Accuracy:", np.round(accuracy * 100, 2), "%")
 
-    scaled_loss = scale_loss(loss, training_data.shape[0] * extra_episodes_on_digit)
+    scaled_loss = scale_loss(loss, training_data.shape[0] * steps)
     if return_confusion and return_accuracy:
         return scaled_loss, accuracy, conf_matrix
     elif return_confusion:
@@ -246,6 +243,7 @@ def run_optimize(
     continue_path=None,
     save=False,
     sub_folder=None,
+    evaluate_method=evaluate_nca,
 ):
     import cma
 
@@ -326,9 +324,9 @@ def run_optimize(
 
             # Evaluate each candidate solution
             if pool is None:
-                solutions_fitness = [evaluate_nca_batch(s, **eval_kwargs) for s in solutions]
+                solutions_fitness = [evaluate_method(s, **eval_kwargs) for s in solutions]
             else:
-                jobs = pool.map_async(partial(evaluate_nca_batch, **eval_kwargs), solutions)
+                jobs = pool.map_async(partial(evaluate_method, **eval_kwargs), solutions)
                 solutions_fitness = jobs.get()
                 """jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]"""
@@ -359,13 +357,13 @@ def run_optimize(
                 eval_kwargs["return_accuracy"] = True
 
                 # We don't have to change the neo size because it's already train size
-                loss_train_size, acc_train_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_train_size, acc_train_size = evaluate_method(winner_flat, **eval_kwargs)
 
                 # Alter specific neo sizes for testing size
                 eval_kwargs["N_neo"] = config.scale.test_n_neo
                 eval_kwargs["M_neo"] = config.scale.test_m_neo
 
-                loss_test_size, acc_test_size = evaluate_nca_batch(winner_flat, **eval_kwargs)
+                loss_test_size, acc_test_size = evaluate_method(winner_flat, **eval_kwargs)
 
                 testing_data, target_data_test = None, None
 
@@ -502,6 +500,11 @@ if __name__ == "__main__":
 
     moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
+    if config.training.stable or config.training.pool_training or args.visualize:
+        evaluate_method = evaluate_nca
+    else:
+        evaluate_method = evaluate_nca_batch
+
     # Should we optimize to get a new winner, or load winner?
     if args.test_path is None:
         winner_flat = run_optimize(
@@ -514,6 +517,7 @@ if __name__ == "__main__":
             continue_path=args.continue_path,
             save=args.save,
             sub_folder=args.sub_folder,
+            evaluate_method=evaluate_method,
         )
     else:
         winner_flat = Logger.load_checkpoint(args.test_path)
@@ -524,7 +528,7 @@ if __name__ == "__main__":
     training_data, target_data = data_func(**kwargs, test=True)
 
     print("\nEvaluating winner:")
-    loss, acc, conf = evaluate_nca(
+    loss, acc, conf = evaluate_method(
         winner_flat,
         training_data,
         target_data,

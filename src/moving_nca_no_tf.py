@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 from numba import jit, njit
 from src.perception_matrix import get_perception_matrix
@@ -192,7 +194,7 @@ class MovingNCA:
         # I should really phase out having guesses here, I don't use it for anything... TODO
         return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
-    def classify(self, img_raw, visualize=False):
+    def classify(self, img_raw, visualize=False, step=None):
         """
         Classify the input image using the trained model.
 
@@ -205,19 +207,18 @@ class MovingNCA:
             np.ndarray: The guesses made by the model.
         """
 
-        if visualize:
-            import copy
-
-            images = []
-            states = []
-            actions = []
-            perceptions_through_time = []
+        if visualize and (step is None or step == 0):
+            self.images = []
+            self.states = []
+            self.actions = []
+            self.perceptions_through_time = []
 
         N_neo, M_neo = self.size_neo
         N_active, M_active = self._size_active
 
         guesses = None
-        for _ in range(self.iterations):
+        iterations = self.iterations if step is None else 1
+        for _ in range(iterations):
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
             collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo, N_active, M_active)
 
@@ -237,22 +238,26 @@ class MovingNCA:
                 )
 
             if visualize:
-                images.append(copy.deepcopy(img_raw))
-                states.append(copy.deepcopy(self.state))
+                self.images.append(copy.deepcopy(img_raw))
+                self.states.append(copy.deepcopy(self.state))
                 if self.moving:
-                    actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
-                perceptions_through_time.append(copy.deepcopy(self.perceptions))
+                    self.actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
+                self.perceptions_through_time.append(copy.deepcopy(self.perceptions))
 
-        if visualize:
+        if visualize and (step is None or step == self.iterations - 1):
             self.visualize(
-                images,
-                states,
-                actions if len(actions) != 0 else None,
-                perceptions_through_time,
+                self.images,
+                self.states,
+                self.actions if len(self.actions) != 0 else None,
+                self.perceptions_through_time,
                 self.num_hidden,
                 self.num_classes,
                 self.labels,
             )
+            self.images = None
+            self.states = None
+            self.actions = None
+            self.perceptions_through_time = None
 
         return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
