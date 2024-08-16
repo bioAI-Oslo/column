@@ -4,6 +4,8 @@ import os
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
+from functools import partial
+
 import numpy as np
 from src.moving_nca_no_tf import MovingNCA
 
@@ -204,21 +206,19 @@ def evaluate_nca(
 
             loss += loss_function(class_predictions, guesses, expected)
 
-            if verbose or return_accuracy:
-                belief = np.mean(class_predictions, axis=(0, 1))
-                believed = predicting_method(class_predictions)
-                actual = np.argmax(expected)
-                accuracy += int(believed == actual)
-                if verbose:
-                    print("Expected", expected, "got", belief)
+        if verbose or return_accuracy:
+            belief = np.mean(class_predictions, axis=(0, 1))
+            believed = predicting_method(class_predictions)
+            actual = np.argmax(expected)
+            accuracy += int(believed == actual)
+            if verbose:
+                print("Expected", expected, "got", belief)
 
-                if return_confusion:
-                    conf_matrix[actual, believed] += 1
+            if return_confusion:
+                conf_matrix[actual, believed] += 1
 
     if return_accuracy:
-        accuracy /= training_data.shape[0] * steps
-    if return_confusion:
-        conf_matrix /= steps
+        accuracy /= training_data.shape[0]
 
     if verbose:
         print("Accuracy:", np.round(accuracy * 100, 2), "%")
