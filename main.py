@@ -126,16 +126,26 @@ def evaluate_nca_batch(
     stable=False,
     return_confusion=False,
 ):
+    if stable:
+        steps = moving_nca_kwargs["iterations"]
+    else:
+        steps = 1
+
     # Getting network
     network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     # Reset network and get classifications
     B = training_data.shape[0]
     network.reset_batched(B)
-    class_predictions, _ = network.classify_batch(training_data, visualize=False)
 
-    # Get loss
-    loss = loss_function(class_predictions, None, target_data)
+    loss = 0
+    for step in range(steps):
+        class_predictions, _ = network.classify_batch(training_data, visualize=False, step=step if stable else None)
+
+        # Get loss
+        loss += loss_function(class_predictions, None, target_data)
+
+    loss /= steps
 
     # Calculate and return accuracy if wanted
     if return_accuracy:
@@ -500,7 +510,7 @@ if __name__ == "__main__":
 
     moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
-    if config.training.stable or config.training.pool_training or args.visualize:
+    if config.training.pool_training or args.visualize:
         evaluate_method = evaluate_nca
     else:
         evaluate_method = evaluate_nca_batch

@@ -138,7 +138,7 @@ class MovingNCA:
 
         return NotImplementedError()
 
-    def classify_batch(self, images_raw, visualize=False):
+    def classify_batch(self, images_raw, visualize=False, step=None):
         """
         Classify a batch of images using the networks perception and state, and update the state and perception accordingly.
         This function alters the object's state and perception (batched).
@@ -156,7 +156,8 @@ class MovingNCA:
         N_active, M_active = self._size_active
 
         guesses = None
-        for _ in range(self.iterations):
+        iterations = self.iterations if step is None else 1
+        for _ in range(iterations):
             # The input vector is the perception and state
             input = np.empty((B * N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
             # This function alters "input" in place
