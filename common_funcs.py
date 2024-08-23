@@ -1,3 +1,4 @@
+from main import get_from_config
 from src.data_processing import (
     get_CIFAR_data,
     get_labels,
@@ -16,9 +17,8 @@ from src.loss import (
     pixel_wise_CE_and_energy,
     pixel_wise_L2,
     pixel_wise_L2_and_CE,
-    scale_loss,
 )
-from src.moving_nca import MovingNCA
+from src.moving_nca_no_tf import MovingNCA
 from src.utils import get_config
 
 
@@ -27,42 +27,22 @@ def get_network(sub_path, num_data, size_img=None):
 
     # Also load its config
     config = get_config(sub_path)
+    moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
-    # Fetch info from config and enable environment for testing
-    mnist_digits = eval(config.dataset.mnist_digits)
-
-    predicting_method = eval(config.training.predicting_method)
-
-    moving_nca_kwargs = {
-        "size_image": (config.dataset.size, config.dataset.size),
-        "num_hidden": config.network.hidden_channels,
-        "hidden_neurons": config.network.hidden_neurons,
-        "iterations": config.network.iterations,
-        "position": str(config.network.position),
-        "moving": config.network.moving,
-        "mnist_digits": mnist_digits,
-        "img_channels": config.network.img_channels,
-    }
-
+    # Allow image size to be adjusted
     if size_img is not None:
         moving_nca_kwargs["size_image"] = size_img
 
-    data_func = eval(config.dataset.data_func)
-    kwargs = {
-        "CLASSES": mnist_digits,
-        "SAMPLES_PER_CLASS": num_data,
-        "verbose": False,
-        "test": True,
-        "colors": True if config.network.img_channels == 3 else False,
-    }
+    # Alter data kwargs
+    kwargs["test"] = True
+    kwargs["SAMPLES_PER_CLASS"] = num_data
 
-    labels = get_labels(data_func, kwargs["CLASSES"])
-    # Get labels for plotting
-    moving_nca_kwargs["labels"] = labels
+    # Get labels
+    labels = moving_nca_kwargs["labels"]
 
     # Load network
     network = MovingNCA.get_instance_with(
-        winner_flat, size_neo=(config.scale.test_n_neo, config.scale.test_m_neo), **moving_nca_kwargs
+        winner_flat, size_neo=(config.scale.train_n_neo, config.scale.train_m_neo), **moving_nca_kwargs
     )
 
     return network, labels, data_func, kwargs, predicting_method
