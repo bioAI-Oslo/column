@@ -258,10 +258,14 @@ def get_data(
     train_y = []
     for i in range(N_digits):
         one_hot = [1.0 if x == i else 0.0 for x in range(N_digits)]
-        for _ in range(SAMPLES_PER_CLASS):
+        indexes = np.random.choice(range(len(sorted_X[i])), size=SAMPLES_PER_CLASS, replace=False)
+        for elem in indexes:
+            train_X.append(sorted_X[i][elem])
+            train_y.append(one_hot)
+        """for _ in range(SAMPLES_PER_CLASS):
             index = random.randrange(len(sorted_X[i]))
             train_X.append(sorted_X[i][index])
-            train_y.append(one_hot)
+            train_y.append(one_hot)"""
 
     training_data, target_data = shuffle(train_X, train_y)
 
@@ -379,15 +383,36 @@ if __name__ == "__main__":
     np.random.seed(0)
     random.seed(0)
 
-    data_func = get_MNIST_data_resized
+    data_func = get_MNIST_data
     kwargs = {
         "CLASSES": (0, 1, 2, 3, 4),
         "SAMPLES_PER_CLASS": 1,
         "verbose": True,
-        "test": True,
+        "test": False,
         "colors": False,
         "size": 10,
     }
 
     # print(get_max_samples_balanced(data_func, **kwargs))
+
+    np.random.seed(0)
+    random.seed(0)
+    _plot_dataset(data_func, kwargs)
+
+    kwargs["test"] = True
+
+    np.random.seed(0)
+    random.seed(0)
+    _plot_dataset(data_func, kwargs)
+
+    kwargs["test"] = False
+
+    np.random.seed(0)
+    random.seed(0)
+    _plot_dataset(data_func, kwargs)
+
+    kwargs["test"] = True
+
+    np.random.seed(0)
+    random.seed(0)
     _plot_dataset(data_func, kwargs)
