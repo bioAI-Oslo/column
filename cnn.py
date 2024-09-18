@@ -1,4 +1,6 @@
 import functools
+import json
+import os
 import time
 from copy import deepcopy
 
@@ -7,36 +9,36 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-from src.utils import get_unique_lists, get_weights_info
-from tensorflow.keras import optimizers
-from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
-from tqdm import tqdm
-
-from column.src.data_processing import (
+from src.data_processing import (
     get_CIFAR_data,
     get_max_samples_balanced,
     get_MNIST_data,
     get_MNIST_data_padded,
     get_MNIST_data_resized,
+    get_MNIST_fashion_data,
 )
+from src.utils import get_unique_lists, get_weights_info
+from tensorflow.keras import optimizers
+from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
+from tqdm import tqdm
 
-CLASSES = (1, 4, 6, 7, 8)
-trained_image_size = 32
-img_channels = 3
+CLASSES = (0, 1, 2)
+trained_image_size = 28
+img_channels = 1
 fashion = False
 
-saved_model = "./experiments/cnn/checkpoint_model_cifar.ckpt"
-
 # Data
-data_func = get_CIFAR_data
+data_func = get_MNIST_data
 kwargs = {
     "CLASSES": CLASSES,
     "verbose": False,
     "colors": True if img_channels == 3 else False,
 }
 
-samples_per_digit = get_max_samples_balanced(data_func, kwargs, test=False)
-samples_per_digit_test = get_max_samples_balanced(data_func, kwargs, test=True)
+
+samples_per_digit = get_max_samples_balanced(data_func, **kwargs, test=False)
+
+samples_per_digit_test = get_max_samples_balanced(data_func, **kwargs, test=True)
 
 
 class CNN(tf.keras.Model):
@@ -45,15 +47,27 @@ class CNN(tf.keras.Model):
 
         self.dmodel = tf.keras.Sequential(
             [
-                Conv2D(10, 5, padding="valid", input_shape=img_dim, activation="tanh"),
-                Conv2D(10, 3, padding="valid", activation="tanh"),
+                Conv2D(10, 3, padding="valid", input_shape=img_dim, activation="relu"),
                 MaxPooling2D(pool_size=(2, 2)),
-                Conv2D(10, 3, padding="valid", activation="tanh"),
+                Conv2D(10, 3, padding="valid", activation="relu"),
                 MaxPooling2D(pool_size=(2, 2)),
                 Flatten(),
-                Dense(digits),
+                Dense(100, activation="relu"),
+                Dense(digits, activation="softmax"),
             ]
         )
+
+        """self.dmodel = tf.keras.Sequential(
+            [
+                Conv2D(32, 4, padding="valid", input_shape=img_dim, activation="relu"),
+                MaxPooling2D(pool_size=(2, 2)),
+                Conv2D(32, 4, padding="valid", activation="relu"),
+                MaxPooling2D(pool_size=(2, 2)),
+                Flatten(),
+                Dense(128, activation="relu"),
+                Dense(digits, activation="relu"),
+            ]
+        )"""
 
         N, M, O = img_dim
         out = self(tf.zeros([1, N, M, O]))  # dummy calls to build the model
@@ -67,8 +81,9 @@ class CNN(tf.keras.Model):
 
 
 def plot_history(history):
-    plt.plot(history.history["loss"])
-    plt.plot(history.history["categorical_accuracy"])
+    plt.plot(history.history["loss"], label="loss")
+    plt.plot(history.history["categorical_accuracy"], label="accuracy")
+    plt.legend()
     plt.show()
 
 
@@ -89,7 +104,7 @@ def resize_for_CNN(size, mnist_digits):
     return np.array(resized_x_data), test_y
 
 
-def get_model():
+def get_model(saved_model):
     model = CNN(digits=len(CLASSES))
     model.compile(
         optimizers.Adam(lr=1e-4),
@@ -123,76 +138,144 @@ def plot_image_scale_always_full_size():
     plt.show()
 
 
-def plot_weights_dense():
-    model = get_model()
+def plot_state_damage():
+    from zero_shot_damage import (
+        alter_divisible,
+        flip_values,
+        sample_randomly,
+        sample_rectangular,
+        sample_squarely,
+        set_to_random,
+        set_to_zero,
+    )
 
-    dense_layer = np.array(model.weights[0]).T
-    print(dense_layer.shape)
+    # The folder to plot from
+    path = "./experiments/cnn/mnist3/"
 
-    for i in range(len(CLASSES)):
-        reshapen = np.reshape(dense_layer[i], (trained_image_size, trained_image_size))
-        plt.subplot(1, len(CLASSES), i + 1)
-        plt.imshow(reshapen)
+    # Get data
+    images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=40, verbose=False, test=True)
+    true_digits = np.argmax(labels, axis=1)
+
+    # The sizes to test
+    test_sizes_percentages = np.linspace(0, 1, 11)
+
+    # Get scores
+    all_scores = {}
+
+    for sub_path in os.listdir(path):
+        if os.path.isdir(path + sub_path):
+            saved_model = path + sub_path + "/checkpoint_model.ckpt"
+            model = get_model(saved_model)
+
+            # Get test sizes
+            _, N, M, O = model.dmodel.layers[1].input_shape
+            test_sizes = np.round(np.array(test_sizes_percentages, dtype=float) * (N * M)).astype(int)
+
+            # Get accuracies
+            accuracies = []
+            for test_size in test_sizes:
+                agreed = 0
+                for image, true in zip(images, true_digits):  # For all samples
+
+                    # Run the sample through the first layer to get the first feature map
+                    output = np.array(
+                        model.dmodel.layers[0](image.reshape(1, trained_image_size, trained_image_size, img_channels))
+                    )
+
+                    # Get the indexes of the feature map to silence
+                    x_indexes, y_indexes = sample_squarely(test_size, N, M)
+
+                    # Silence the feature map
+                    for x in x_indexes:
+                        for y in y_indexes:
+                            output[:, x - 1, y - 1, :] = 0
+
+                    # Run the sample through the rest of the layers
+                    for layer in model.dmodel.layers[1:]:
+                        output = layer(output)
+
+                    # Get the prediction
+                    pred = np.argmax(output)
+                    if true == pred:
+                        agreed += 1
+
+                print(test_size, agreed / len(true_digits))
+                accuracies.append(agreed / len(true_digits))
+
+            all_scores[sub_path] = accuracies
+
+    # Plot
+    for key, value in all_scores.items():
+        plt.plot(test_sizes_percentages, value, label=key)
+
+    ax = plt.gca()
+    ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
+    ax.set_xticks(test_sizes_percentages, np.round(test_sizes_percentages * 100))
+    ax.set_ylabel("Retained accuracy (%)")
+    ax.set_xlabel("Randomly silenced cells (%)")
 
     plt.show()
 
+    # Save
+    all_scores["test_sizes"] = test_sizes_percentages.tolist()
+    json.dump(all_scores, open(path + "/square_silencing_robustness.json", "w"))
 
-def plot_weights_conv():
-    model = get_model()
 
-    first_conv_layer = np.array(model.weights[0]).T
+def plot_image_noise_robustness():
+    from zero_shot_noise_perturbations import add_noise
 
-    for i in range(len(first_conv_layer)):
-        plt.subplot(4, len(CLASSES), i + 1)
-        plt.imshow(first_conv_layer[i, 0])
+    # The folder to plot from
+    path = "./experiments/cnn/mnist3/"
 
-    second_conv_layer = np.array(model.weights[2]).T
+    # The noise to test
+    to_test = np.linspace(0, 1.0, 11)
+    NUM_DATA = 40
 
-    for i in range(len(second_conv_layer)):
-        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES))
-        plt.imshow(second_conv_layer[i])
+    # Get data
+    images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=NUM_DATA, verbose=False, test=True)
+    true_digits = np.argmax(labels, axis=1)
 
-    third_conv_layer = np.array(model.weights[4]).T
+    # Get scores
+    all_scores = {}
 
-    for i in range(len(third_conv_layer)):
-        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES) * 2)
-        plt.imshow(third_conv_layer[i])
+    for sub_path in os.listdir(path):
+        if os.path.isdir(path + sub_path):
+            saved_model = path + sub_path + "/checkpoint_model.ckpt"
+            model = get_model(saved_model)
 
-    dense_layer = np.array(model.weights[6]).T
+            accuracies = []
 
-    for i in range(len(CLASSES)):
-        reshapen = np.reshape(dense_layer[i], (5, 5, 3))
-        plt.subplot(4, len(CLASSES), i + 1 + len(CLASSES) * 3)
-        plt.imshow(reshapen)
+            for noise in to_test:
+
+                # Add noise
+                images_noisy = add_noise(images, noise)
+
+                # Get accuracies
+                predictions = model.predict(images_noisy)
+
+                acc = tf.keras.metrics.CategoricalAccuracy()
+                acc.update_state(labels, predictions)
+                accuracies.append(float(acc.result().numpy()))
+
+            all_scores[sub_path] = list(accuracies)
+
+    # Plot
+    for key, value in all_scores.items():
+        plt.plot(to_test, value, label=key)
+
+    ax = plt.gca()
+    ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
+    ax.set_xticks(to_test)
+    ax.set_ylabel("Accuracy (%)")
+    ax.set_xlabel("Randomly silenced cells (%)")
 
     plt.show()
 
+    print(all_scores)
 
-def plot_feature_maps():
-    model = get_model()
-
-    middle_images = []
-    image = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=samples_per_digit_test, verbose=False, test=True)[0][0]
-
-    image = np.expand_dims(image, axis=0)
-    image = np.expand_dims(image, axis=-1)
-    middle_images.append(image)
-
-    answer = None
-    for layer in model.dmodel.layers:
-        image = layer(image)
-        print(layer.name)
-        if layer.name == "dense":
-            answer = image
-        elif layer.name != "flatten":
-            middle_images.append(image)
-
-    for img in middle_images:
-        plt.subplot(1, len(middle_images), middle_images.index(img) + 1)
-        plt.imshow(img[0])
-
-    print("Answer:", answer[0])
-    plt.show()
+    # Save
+    all_scores["test_sizes"] = to_test.tolist()
+    json.dump(all_scores, open(path + "/image_noise_robustness.json", "w"))
 
 
 def plot_image_scale():
@@ -227,10 +310,10 @@ def plot_image_scale():
 def plot_picture_damage():
     model = get_model()
 
-    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
-    B, N, M = test_x.shape
+    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=1, test=True)
+    B, N, M, _ = test_x.shape
 
-    radius = 5
+    radius = 10
     scores = np.zeros((N, M))
 
     for x in tqdm(range(N)):
@@ -255,22 +338,47 @@ def plot_picture_damage():
 
             scores[x, y] = test_acc
 
-    plt.imshow(scores)
+    im = plt.imshow(scores * 100, vmin=0.0, vmax=100)
+    cb = plt.colorbar(im, ax=[plt.gca()], location="right")
+    plt.xticks([])
+    plt.yticks([])
     plt.show()
 
 
 def main():
-    train_epochs = 100
     train_batches = 200
+    train_epochs = 30
+
+    # Make a unique experiment folder name by the time and date
+    name = f"{time.localtime().tm_mday}-{time.localtime().tm_mon}-" + str(time.localtime().tm_year)[-2:]
+    name += f"_{time.localtime().tm_hour}:{time.localtime().tm_min}"
+
+    # Sometimes, the path is already made. Add a unique numerical suffix
+    additive = 2
+    new_name = name
+    while os.path.isdir(f"./experiments/cnn/mnist3/{new_name}"):
+        new_name = name + "_" + str(additive)
+        additive += 1
+
+    saved_model = f"./experiments/cnn/mnist3/{new_name}/checkpoint_model.ckpt"
 
     # Script wide functions
     train_x, train_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit)
     test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
 
     model = CNN(digits=len(CLASSES))
+
+    class EnergyLoss(tf.keras.losses.Loss):
+        def __init__(self, rate=0.01):
+            super().__init__()
+            self.rate = rate
+
+        def call(self, y_true, y_pred):
+            return np.sum(y_pred**2) * self.rate
+
     model.compile(
         optimizers.Adam(lr=1e-4),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+        loss=[tf.keras.losses.CategoricalCrossentropy(from_logits=False), EnergyLoss(rate=0.0001)],
         metrics=[tf.keras.metrics.CategoricalAccuracy()],
     )
 
@@ -350,4 +458,4 @@ def find_easiest_digits():
 
 
 if __name__ == "__main__":
-    main()
+    plot_image_noise_robustness()
