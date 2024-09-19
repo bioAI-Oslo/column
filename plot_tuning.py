@@ -17,10 +17,10 @@ sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/mnist10_one_network"
+path = "./experiments/neo_size_experiment"
 
 # Detect difference
-feature1, feature2 = "scale.train_n_neo", "network.hidden_neurons"
+feature1, feature2 = "network.hidden_channels", "scale.train_n_neo"
 
 ################################ FUNCTIONS ################################
 
@@ -184,8 +184,8 @@ def plot_convergence_plots_total(convergence, title, ylabel, yticks=None):
 
             plt.subplot(N, M, i * M + j + 1)
 
-            for line in convergence[i][j]:
-                plt.plot(line, color=color)
+            for k, line in enumerate(convergence[i][j]):
+                plt.plot(x_axis[i][j][k], line, color=color)
 
             feature1_name = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
             feature2_name = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
