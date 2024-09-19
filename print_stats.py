@@ -4,7 +4,6 @@ import argparse
 import os
 
 import numpy as np
-from common_funcs import get_network
 from main import evaluate_nca_batch, get_from_config
 from src.data_processing import (
     get_CIFAR_data,
@@ -26,7 +25,6 @@ from src.loss import (
     pixel_wise_L2,
     pixel_wise_L2_and_CE,
 )
-from src.moving_nca import MovingNCA
 from src.utils import get_config
 
 
@@ -73,8 +71,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path
 
-    num_data_train = 100
-    num_data_test = 100
+    num_data_train = None
+    num_data_test = None
 
     performances_train = []
     performances_test = []
@@ -100,8 +98,13 @@ if __name__ == "__main__":
     print()
     print("Train data performance:")
     print("Best performance:", best_performance)
-    print("Mean accuracy:", np.mean([x[1] for x in performances_train]))
-    print("Mean loss:", np.mean([x[0] for x in performances_train]))
+    print(
+        "Mean accuracy:",
+        np.mean([x[1] for x in performances_train]),
+        "std:",
+        np.std([x[1] for x in performances_train]),
+    )
+    print("Mean loss:", np.mean([x[0] for x in performances_train]), "std:", np.std([x[0] for x in performances_train]))
 
     best_performance_test = None
     for x in performances_test:
@@ -113,5 +116,7 @@ if __name__ == "__main__":
     print()
     print("Test data performance:")
     print("Best performance:", best_performance_test)
-    print("Mean accuracy:", np.mean([x[1] for x in performances_test]))
-    print("Mean loss:", np.mean([x[0] for x in performances_test]))
+    print(
+        "Mean accuracy:", np.mean([x[1] for x in performances_test]), "std:", np.std([x[1] for x in performances_test])
+    )
+    print("Mean loss:", np.mean([x[0] for x in performances_test]), "std:", np.std([x[0] for x in performances_test]))
