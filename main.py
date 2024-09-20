@@ -30,6 +30,7 @@ if deterministic:
 
 def get_from_config(config):
     from src.data_processing import (
+        get_alternating_pattern,
         get_CIFAR_data,
         get_labels,
         get_MNIST_data,
@@ -87,6 +88,7 @@ def get_from_config(config):
         "CLASSES": mnist_digits,
         "SAMPLES_PER_CLASS": config.dataset.samples_per_digit,
         "verbose": False,
+        "test": False,
     }
     # Taking specific care with the data functions
     if (
@@ -207,11 +209,13 @@ def evaluate_nca(
             network.reset()
 
         for step in range(steps):
+            visualize_step = visualize and (visualized < args.vis_num)
+
             class_predictions, guesses = network.classify(
-                img_raw, visualize=visualize and (visualized < args.vis_num), step=step if stable else None
+                img_raw, visualize=visualize_step, step=step if stable else None
             )
 
-            if visualize and (visualized < args.vis_num) and step == steps - 1:
+            if visualize_step and step == steps - 1:
                 visualized += 1
 
             loss += loss_function(class_predictions, guesses, expected)
@@ -484,6 +488,7 @@ if __name__ == "__main__":
         get_simple_object,
         get_simple_object_translated,
         get_simple_pattern,
+        get_test_colors_data,
     )
     from src.logger import Logger
     from src.loss import (
@@ -533,9 +538,10 @@ if __name__ == "__main__":
         winner_flat = Logger.load_checkpoint(args.test_path)
 
     # Get test data for new evaluation
-    # kwargs["SAMPLES_PER_CLASS"] = 800
+    # kwargs["SAMPLES_PER_CLASS"] = 500
 
-    training_data, target_data = data_func(**kwargs, test=True)
+    kwargs["test"] = True
+    training_data, target_data = data_func(**kwargs)
 
     print("\nEvaluating winner:")
     loss, acc, conf = evaluate_method(
