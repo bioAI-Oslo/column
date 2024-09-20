@@ -1,40 +1,24 @@
 """Script to analyze a single network's focus. Do not import from here."""
 
-import argparse
-import os
 from copy import deepcopy
 
-import cv2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import tensorflow as tf
 from common_funcs import get_network
 from localconfig import config
-from main import evaluate_nca
-from skimage.filters.rank import entropy
-from skimage.morphology import cube
 from src.plotting_utils import get_plotting_ticks
-from tqdm import tqdm
 
 ############################### Change here ################################
 
 NUM_DATA = 1  # How many images to classify and visualize
 
 # Network to use, specified by sub_path:
-# sub_path = "experiments/color_cifar/19-3-24_10:38"
-# sub_path = "experiments/fashion/10-3-24_19:30"
-# sub_path = "experiments/fashion/12-3-24_3:14"
-# sub_path = "experiments/simple_pattern/21-3-24_13:56"  # Moving
-# sub_path = "experiments/simple_pattern/21-3-24_15:31"  # Not moving
-# sub_path = "experiments/current_pos_winners/3-3-24_15:58"
-# sub_path = "experiments/simple_object_moving/25-3-24_18:56"
-# sub_path = "experiments/simple_object_nonmoving/26-3-24_10:27"
-# sub_path = "experiments/mnist_final/21-4-24_0:34_2"
-# sub_path = "experiments/fashion_mnist/9-4-24_11:16"
-sub_path = "experiments/simple_pattern_fixed_loss/8-7-24_21:1_3"
-# sub_path = "experiments/fashion_tuning_fixed_loss/6-7-24_0:59"
+# sub_path = "experiments/simple_object_moving/18-7-24_12:4_10"
+# sub_path = "experiments/simple_pattern/16-7-24_15:33_2"
+# sub_path = "experiments/mnist3_stable/15-8-24_16:59"
+sub_path = "experiments/mnist_final/22-8-24_19:16"
 
 ############################################################################
 
@@ -199,16 +183,21 @@ def plot_frequencies_and_beliefs(
     plt.subplot(int(str(rows) + "12"))
     counter = 0
     for line, label_i in zip(np.array(individual_beliefs).T, labels):
+        color = cmap((counter // 2) / max((len(labels) // 2 - 1), 1) / (len(labels) // 2))
+        style = "dashed" if counter % 2 == 0 else "solid"
+        if len(labels) == 3:
+            color = cmap((counter) / max((len(labels)), 1))
+            style = "solid"
         plt.plot(
             line / (config.scale.test_n_neo * config.scale.test_m_neo),
             label=label_i,
-            color=cmap((counter // 2) / max((len(labels) // 2 - 1), 1)),
-            linestyle="dashed" if counter % 2 == 0 else "solid",
+            color=color,
+            linestyle=style,
         )
         counter += 1
 
     plt.title("Correct class is " + labels[np.argmax(y_data_i)])
-    plt.yticks(np.arange(0, 1.1, 0.1), np.arange(0, 110, 10))
+    plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
     plt.ylabel("System beliefs (%)")
     plt.xlabel("Time steps")
     plt.legend()
