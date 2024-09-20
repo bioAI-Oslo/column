@@ -17,7 +17,7 @@ sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/neo_size_experiment"
+path = "./experiments/fashion_final"
 
 # Detect difference
 feature1, feature2 = "network.hidden_channels", "scale.train_n_neo"

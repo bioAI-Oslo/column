@@ -59,6 +59,61 @@ def get_max_samples_balanced(data_func, **kwargs):
     return min_len
 
 
+def get_test_colors_data(verbose=False, **kwargs):
+    class_0 = np.zeros((10, 10, 3))
+    class_1 = np.zeros((10, 10, 3))
+    class_2 = np.zeros((10, 10, 3))
+
+    class_0[:, :, 0] = 1.0
+    class_1[:, :, 1] = 1.0
+    class_2[:, :, 2] = 1.0
+
+    images = np.array([class_0, class_1, class_2])
+    one_hot = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+    if verbose:
+        print("Generating test colors")
+
+    return images, one_hot
+
+
+def get_alternating_pattern(verbose=False, **kwargs):
+    """Only for quick testing"""
+
+    if verbose:
+        print("Generating simple pattern")
+
+    training_data = np.empty((4 * 2, 10, 10, 1))
+    target_data = np.empty((4 * 2, 2))
+
+    for i in range(4):
+
+        class_0 = np.zeros((10, 10, 1))
+        class_1 = np.zeros((10, 10, 1))
+
+        pattern0 = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.float32)
+        pattern1 = np.array([[1, 0, 1], [1, 1, 1], [1, 0, 1]], dtype=np.float32)
+
+        for pattern, class_i in zip([pattern0, pattern1], [class_0, class_1]):
+            class_i[[i for i in range(0, 10, 2)], ::2, 0] = 1.0
+            class_i[1::2, [i for i in range(1, 10, 2)], 0] = 1.0
+
+            start_x = (i % 2) * 7  # 0 7 0 7
+            start_y = ((i // 2) % 2) * 7  # 0 0 7 7
+            class_i[start_x : start_x + 3, start_y : start_y + 3, 0] = pattern
+
+        training_data[i] = class_0
+        training_data[i + 4] = class_1
+
+        target_data[i] = [1, 0]
+        target_data[i + 4] = [0, 1]
+
+    shuffle(training_data, target_data)
+    training_data, target_data = shuffle(training_data, target_data)
+
+    return training_data, target_data
+
+
 def get_simple_pattern(verbose=False, **kwargs):
     """Only for quick testing"""
 
@@ -383,9 +438,9 @@ if __name__ == "__main__":
     np.random.seed(0)
     random.seed(0)
 
-    data_func = get_MNIST_data
+    data_func = get_alternating_pattern
     kwargs = {
-        "CLASSES": (0, 1, 2, 3, 4),
+        "CLASSES": (0, 1),
         "SAMPLES_PER_CLASS": 1,
         "verbose": True,
         "test": False,
@@ -393,26 +448,6 @@ if __name__ == "__main__":
         "size": 10,
     }
 
+    _plot_dataset(data_func, kwargs)
+
     # print(get_max_samples_balanced(data_func, **kwargs))
-
-    np.random.seed(0)
-    random.seed(0)
-    _plot_dataset(data_func, kwargs)
-
-    kwargs["test"] = True
-
-    np.random.seed(0)
-    random.seed(0)
-    _plot_dataset(data_func, kwargs)
-
-    kwargs["test"] = False
-
-    np.random.seed(0)
-    random.seed(0)
-    _plot_dataset(data_func, kwargs)
-
-    kwargs["test"] = True
-
-    np.random.seed(0)
-    random.seed(0)
-    _plot_dataset(data_func, kwargs)
