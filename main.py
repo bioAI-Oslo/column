@@ -345,6 +345,13 @@ def run_optimize(
                 """jobs = [pool.apply_async(evaluate_nca, args=[s], kwds=eval_kwargs) for s in solutions]
                 solutions_fitness = [job.get() for job in jobs]"""
 
+            # weight regularization (sorry that it's here, it was added late in the project)
+            if config.training.lambda_weight is not None and config.training.lambda_weight > 0.0:
+                for i in range(len(solutions)):
+                    solutions_fitness[i] += weight_regularization(
+                        solutions[i], lambda_weight=config.training.lambda_weight
+                    )
+
             # Tell es what the result was. It uses this to update its parameters
             es.tell(solutions, solutions_fitness)
 
@@ -500,6 +507,7 @@ if __name__ == "__main__":
         pixel_wise_CE_and_energy,
         pixel_wise_L2,
         pixel_wise_L2_and_CE,
+        weight_regularization,
     )
     from src.utils import get_weights_info
 

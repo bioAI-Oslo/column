@@ -26,6 +26,10 @@ def energy(img, guesses, expected, lambda_energy=0.0001):
         print("oopsie")
 
 
+def weight_regularization(weights, lambda_weight=0.0001):
+    return np.sum(np.array(weights) ** 2) * lambda_weight
+
+
 def pixel_wise_L2_and_CE(img, guesses, expected):
     # Batch approved
     return pixel_wise_L2(img, guesses, expected) / 2 + pixel_wise_CE(img, guesses, expected) / 2
