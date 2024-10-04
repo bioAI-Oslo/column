@@ -1,5 +1,6 @@
 """Script to analyze a single network's focus. Do not import from here."""
 
+import random
 from copy import deepcopy
 
 import matplotlib
@@ -8,6 +9,7 @@ import numpy as np
 import seaborn as sns
 from common_funcs import get_network
 from localconfig import config
+from skimage import color
 from src.plotting_utils import get_plotting_ticks
 
 ############################### Change here ################################
@@ -15,97 +17,77 @@ from src.plotting_utils import get_plotting_ticks
 NUM_DATA = 1  # How many images to classify and visualize
 
 # Network to use, specified by sub_path:
-# sub_path = "experiments/simple_object_moving/18-7-24_12:4_10"
-# sub_path = "experiments/simple_pattern/16-7-24_15:33_2"
-# sub_path = "experiments/mnist3_stable/15-8-24_16:59"
-sub_path = "experiments/mnist_final/22-8-24_19:16"
+# sub_path = "experiments/simple_object_moving/18-7-24_12:4_10" # Random network for simple object
+# sub_path = "experiments/simple_pattern/16-7-24_15:33_2" # Random network for simple pattern
+# sub_path = "experiments/cifar4_color_tuning3/20-9-24_14:53" # Cool cifar network
+# sub_path = "experiments/fashion_final/17-9-24_0:28"  # Best fashion 10 class network
+# sub_path = "experiments/fashion_final/17-9-24_15:21"  # Another good fashion 10 class network
+# sub_path = "experiments/cifar4_color_tuning4/1-10-24_11:23"
+
+# MNIST 10
+sub_path = "experiments/mnist10_final/11-9-24_9:45"  # Best Mnist 10 class network
+# sub_path = "experiments/mnist10_final/10-9-24_9:13_2"
+# sub_path = "experiments/mnist10_final/6-9-24_10:29"
+# sub_path = "experiments/mnist10_final/5-9-24_12:5"
+# sub_path = "experiments/mnist10_final/9-9-24_11:22"
+# sub_path = "experiments/mnist10_final/10-9-24_9:13"
+# sub_path = "experiments/mnist10_final/2-9-24_15:10"
 
 ############################################################################
 
 
-def get_frequency(network, x_data_i):
+def get_frequency(network, x_data_i, count=False, area=False):
     frequencies = np.zeros((*x_data_i.shape[:2], 1))
 
     # For every field, record position as visited by putting a 1 there
     for row in network.perceptions:
         for x, y in row:
-            frequencies[x, y] = 1
+            for i in range(0, 1 + 2 * int(area)):
+                for j in range(0, 1 + 2 * int(area)):
+                    if count:
+                        frequencies[x + i, y + j] += 1
+                    else:
+                        frequencies[x + i, y + j] = 1
 
     return frequencies
 
 
-def get_frequency_array(image):
-    # p = [[Keys], [Values]] It's just a dumb dictionary
-    p = [[], []]
-    for x in range(image.shape[0]):
-        for y in range(image.shape[1]):
-            # Bin the values of the hidden state
-            label = np.round(image[x, y], 1)
-            # -0.01 would be rounded to -0.0, causing higher fidelity around 0. There is no reason for there to be, so I set -0 to 0.
-            label[label == -0.0] = 0.0
-            label = str(label)  # Making the label a string to use as a weird dictionary
+def get_movement(network, x_data_i, movement_iterations=1):
+    # Network should always be reset before use on one datapoint to null the internal state
+    network.reset()
 
-            if label in p[0]:
-                index = p[0].index(label)
-                p[1][index] += 1
-            else:
-                p[0].append(label)
-                p[1].append(1)
+    positions = np.zeros((network.iterations // movement_iterations, *network.perceptions.shape))
+    movements = np.zeros((network.iterations // movement_iterations, *network.perceptions.shape))
 
-    p[1] = np.array(p[1]) / np.sum(p[1])
+    for step in range(network.iterations // movement_iterations):
+        prev_pos = deepcopy(network.perceptions)
 
-    return p
+        positions[step, :, :, :] = prev_pos
+
+        for int_step in range(movement_iterations):
+            _, _ = network.classify(x_data_i, step=step * movement_iterations + int_step)
+
+        movements[step, :, :, :] = deepcopy(network.perceptions) - prev_pos
+
+    return movements, positions
 
 
-def get_entropy(frequency_array):
-    H = -np.sum(frequency_array * np.log(frequency_array))
-    return H
-
-
-def get_entropy_of_state(network):
-    hidden_channels = network.state[1:-1, 1:-1, : network.num_hidden]
-
-    p = get_frequency_array(hidden_channels)
-
-    H = get_entropy(p[1])
-
-    return H
-
-
-def get_max_entropy(N, M, O):
-    image = np.zeros((N, M, O))
-
-    counter = 0
-    for x in range(image.shape[0]):
-        for y in range(image.shape[1]):
-            for z in range(image.shape[2]):
-                image[x, y, z] = counter
-                counter += 1
-    p = get_frequency_array(image)
-    H = get_entropy(p[1])
-
-    return H
-
-
-def get_frequencies_and_beliefs(network, x_data_i, original_iterations, iterations):
+def get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10, count=False, area=False):
     frequencies_list = []
     individual_beliefs = []
-    entropy_over_time = []
-    hidden_states = []
 
     # Network should always be reset before use on one datapoint to null the internal state
     network.reset()
-    for _ in range(int(original_iterations / iterations)):  # At what rate we'll plot, f.ex plot every 10 iterations
+    for step in range(network.iterations // frequency_iterations):
+        # At what rate we'll plot, f.ex plot every 10 iterations
+
         # Get visitation frequency of pixels
-        frequencies = get_frequency(network, x_data_i)
+        frequencies = get_frequency(network, x_data_i, count=count, area=area)
         frequencies_list.append(deepcopy(frequencies))  # Don't think I have to deepcopy here, but... it doesn't hurt
 
-        # Collect hidden states
-        hidden_states.append(deepcopy(network.state[:, :, : network.num_hidden]))
-
         # Now run the network while recording the beliefs
-        for _ in range(iterations):
-            class_predictions, _ = network.classify(x_data_i)
+        for int_step in range(frequency_iterations):
+            class_predictions, _ = network.classify(x_data_i, step=step * frequency_iterations + int_step)
 
             beliefs = np.zeros((class_predictions.shape[-1]))  # Number of classes
             for x in range(class_predictions.shape[0]):
@@ -118,25 +100,18 @@ def get_frequencies_and_beliefs(network, x_data_i, original_iterations, iteratio
 
             individual_beliefs.append(beliefs)
 
-            entropy_over_time.append(get_entropy_of_state(network))
-
     # Get visitation frequency of pixels
     # Note: These field positions are the 50th timestep, and hasn't been trained for. Consider plotting the 49th instead.
-    frequencies = get_frequency(network, x_data_i)
+    frequencies = get_frequency(network, x_data_i, count=count, area=area)
     frequencies_list.append(deepcopy(frequencies))
 
-    # Collect hidden states
-    hidden_states.append(deepcopy(network.state[:, :, : network.num_hidden]))
-
-    return frequencies_list, individual_beliefs, entropy_over_time, hidden_states
+    return frequencies_list, individual_beliefs
 
 
-def plot_frequencies_and_beliefs(
-    frequencies_list, individual_beliefs, entropy_over_time, hidden_states, x_data_i, y_data_i, iterations, labels
-):
+def plot_frequencies_and_beliefs(frequencies_list, individual_beliefs, x_data_i, y_data_i, iterations, labels):
     plt.figure()
 
-    rows = 2  # 3 + len(hidden_states[0][0, 0])
+    rows = 2
 
     # We start by plotting the original image with the fields on top for a few selected timesteps
 
@@ -202,84 +177,202 @@ def plot_frequencies_and_beliefs(
     plt.xlabel("Time steps")
     plt.legend()
 
-    """plt.subplot(int(str(rows) + "13"))
-    plt.plot(entropy_over_time, label="Entropy")
-    plt.plot(
-        [get_max_entropy(hidden_states[0].shape[0], hidden_states[0].shape[1], hidden_states[0].shape[2])]
-        * len(entropy_over_time),
-        color="gray",
-        linestyle="dashed",
-        label="Max entropy",
-    )
 
-    plt.title("Entropy over time")
-    plt.xlabel("Time steps")
-    plt.legend()
-
-    maxx = np.max(hidden_states)
-    minn = np.min(hidden_states)
-    for i, hidden_state in enumerate(hidden_states):
-        for j in range(hidden_state.shape[-1]):
-            plt.subplot(rows, len(hidden_states), len(hidden_states) * (3 + j) + 1 + i)
-            plt.imshow(hidden_state[1:-1, 1:-1, j], vmax=maxx, vmin=minn)"""
-
-
-def plotting_individual_classifications():
+def plot_individual_classifications():
     # Get network and data
     network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
+    kwargs["test"] = True
     test_data, target_data = data_func(**kwargs)
-
-    # By setting iterations to 1, we can exit the loop to manipulate state, and then (by not resetting) continue the loop
-    original_iterations = network.iterations
-    iterations = 10  # At what rate we'll plot. F.ex. plot every 10 iterations
-    network.iterations = 1
 
     # For each datapoint
     for x_data_i, y_data_i in zip(test_data, target_data):
         # Get frequencies and individual beliefs
         # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
         # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
-        frequencies_list, individual_beliefs, entropy_over_time, hidden_states = get_frequencies_and_beliefs(
-            network, x_data_i, original_iterations, iterations
-        )
+        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10)
         plot_frequencies_and_beliefs(
             frequencies_list,
             individual_beliefs,
-            entropy_over_time,
-            hidden_states,
             x_data_i,
             y_data_i,
-            iterations,
+            network.iterations,
             labels,
         )
 
     plt.show()
 
 
-if __name__ == "__main__":
-    plotting_individual_classifications()
+def plot_individual_classifications_beliefs():
+    # Get network and data
+    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
+    kwargs["test"] = True
+    test_data, target_data = data_func(**kwargs)
 
-    """ents = []
-    for size in range(1, 50):
-        image = np.zeros((size, size, 3))
-        p = get_frequency_array(image)
-        H = get_entropy(p[1])
+    # For each datapoint
+    for x_data_i, y_data_i in zip(test_data, target_data):
+        # Get frequencies and individual beliefs
+        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
+        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
+        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10)
 
-        print("Homogeneous entropy:", H)
-
+        sns.set_theme()
+        colors = [
+            "#2C2463",
+            "#DC267F",
+            "#EF792A",
+            "#D0AE3C",
+        ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
+        plt.figure()
         counter = 0
-        for x in range(image.shape[0]):
-            for y in range(image.shape[1]):
-                for z in range(image.shape[2]):
-                    image[x, y, z] = counter
-                    counter += 1
-        p = get_frequency_array(image)
-        H = get_entropy(p[1])
-        print(p[1][0])
+        for line, label_i in zip(np.array(individual_beliefs).T, labels):
+            color = cmap((counter // 2) / max((len(labels) // 2 - 1), 1) / (len(labels) // 2))
+            style = "dashed" if counter % 2 == 0 else "solid"
+            if len(labels) == 3:
+                color = cmap((counter) / max((len(labels)), 1))
+                style = "solid"
+            plt.plot(
+                line / (config.scale.test_n_neo * config.scale.test_m_neo),
+                label=label_i,
+                color=color,
+                linestyle=style,
+            )
+            counter += 1
 
-        ents.append(H)
+        plt.title("Correct class is " + labels[np.argmax(y_data_i)])
+        plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
+        plt.ylabel("System beliefs (%)")
+        plt.xlabel("Time steps")
+        plt.legend()
 
-        print("Noise entropy:", H)
+    plt.show()
 
-    plt.plot(range(1, 50), ents)
-    plt.show()"""
+
+def plot_heatmap():
+    # Get network and data
+    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
+    kwargs["test"] = True
+    test_data, target_data = data_func(**kwargs)
+
+    # For each datapoint
+    for x_data_i, y_data_i in zip(test_data, target_data):
+        # Get frequencies and individual beliefs
+        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
+        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
+        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(
+            network, x_data_i, frequency_iterations=1, count=False, area=True
+        )
+
+        fig = plt.figure()
+        fig.suptitle("Believed class is " + labels[np.argmax(individual_beliefs[-1])])
+
+        plt.subplot(131)
+        plt.imshow(x_data_i, cmap="gray")
+        plt.title("Input image")
+
+        heatmap = np.mean(frequencies_list, axis=(0, -1))
+
+        plt.subplot(132)
+        plt.imshow(heatmap)
+        plt.title("Field position heatmap")
+
+        if x_data_i.shape[2] <= 1:
+            plt.subplot(133)
+            image_plus_heatmap = np.zeros((x_data_i.shape[0], x_data_i.shape[1], 3))
+            image_plus_heatmap[:, :, 0] = (heatmap) / np.max(heatmap)
+            image_plus_heatmap[:, :, 1] = x_data_i[:, :, 0] * 0.7
+            image_plus_heatmap[:, :, 2] = (heatmap) / np.max(heatmap)
+            plt.imshow(image_plus_heatmap)
+            plt.title("image + heatmap")
+
+        else:
+            plt.subplot(133)
+            image_plus_heatmap = np.zeros((x_data_i.shape[0], x_data_i.shape[1], 3))
+            image_plus_heatmap[:, :, 0] = (heatmap) / np.max(heatmap)
+            image_plus_heatmap[:, :, 1] = color.rgb2gray(x_data_i)
+            image_plus_heatmap[:, :, 2] = (heatmap) / np.max(heatmap)
+            plt.imshow(image_plus_heatmap)
+            plt.title("image + heatmap")
+
+        plt.show()
+
+
+def plot_path_map():
+    # Get network and data
+    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
+    kwargs["test"] = True
+    test_data, target_data = data_func(**kwargs)
+
+    # For each datapoint
+    for x_data_i, y_data_i in zip(test_data, target_data):
+        # Get frequencies and individual beliefs
+        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
+        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
+        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(
+            network, x_data_i, frequency_iterations=1, count=False, area=True
+        )
+
+        movement_iterations = 2
+        partitions = 5
+
+        movements, positions = get_movement(network, x_data_i, movement_iterations=movement_iterations)
+
+        plt.figure()
+
+        for i in range(len(movements) // partitions):
+            all_positions = {}
+
+            for movement, position in zip(
+                movements[i * partitions : (i + 1) * partitions], positions[i * partitions : (i + 1) * partitions]
+            ):
+
+                for x in range(movement.shape[0]):
+                    for y in range(movement.shape[1]):
+                        if (position[x, y, 0], position[x, y, 1]) not in all_positions:
+                            all_positions[(position[x, y, 0], position[x, y, 1])] = [
+                                [movement[x, y, 0], movement[x, y, 1]]
+                            ]
+                        else:
+                            all_positions[(position[x, y, 0], position[x, y, 1])].append(
+                                [movement[x, y, 0], movement[x, y, 1]]
+                            )
+
+            plt.subplot(int(str(1) + str(len(movements) // partitions) + str(1 + i)))
+            plt.imshow(x_data_i, cmap="gray")
+            plt.title(
+                str(i * partitions * movement_iterations) + " - " + str((i + 1) * partitions * movement_iterations)
+            )
+
+            for pos, movements_at_point in all_positions.items():
+                avg_movement = np.mean(movements_at_point, axis=0)
+                avg_movement /= np.linalg.norm(avg_movement)
+                if avg_movement[0] == 0 and avg_movement[1] == 0:
+                    plt.scatter(pos[1] + 1, pos[0] + 1, color="hotpink")
+                else:
+                    plt.arrow(
+                        pos[1] + 1,
+                        pos[0] + 1,
+                        avg_movement[1],
+                        avg_movement[0],
+                        width=0.2,
+                        alpha=min(len(movements_at_point) / 4, 1),
+                        color="hotpink",
+                    )
+                """for movement in movements_at_point:
+                    plt.arrow(
+                        pos[1] + 1,
+                        pos[0] + 1,
+                        movement[1],
+                        movement[0],
+                        width=0.4,
+                        alpha=0.2,
+                        color="hotpink",
+                    )"""
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    random.seed(42)
+    plot_individual_classifications_beliefs()
