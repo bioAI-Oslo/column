@@ -14,6 +14,12 @@ python3 main.py
 
 There are several flags to modify the output of main.py, f.ex. "-s" will allow you to save. With this option, a folder "experiments" will be made in the folder, and a sub-folder will be added that contains your results. All sub-folder names are unique. 
 
+To play an animation of a trained ANCA:
+```python
+python3 main.py -tp path/to/your/experiment/folder -c path/to/your/experiment/folder/config -v -vn N
+```
+where N is the amount of samples you want to see an animation for, and "-v" signfies visualization. 
+
 To plot the results from any result folder, run 
 
 ```python
@@ -22,9 +28,7 @@ python3 plot_runs.py path/to/your/experiment/folder
 
 Path can be absolute or relative. 
 
-The folder "src" contains the functionality used in main.py. Most notably, "moving_nca.py" contains the class of the new system. But keep in mind that how to train the system lies in main.py. 
-
-The script zero_shot_scalability.py is currently outdated. TODO. 
+The folder "src" contains the functionality used in main.py. Most notably, "moving_nca_no_tf.py" contains the class of the new system. But keep in mind that how to train the system lies in main.py. 
 
 ## Authors
 
