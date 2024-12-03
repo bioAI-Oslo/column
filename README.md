@@ -1,19 +1,8 @@
-# A cortical column inspired system
+# Movement Drives Emergent Attention and Scalability in Active Neural Cellular Automata
 
-This project is investigating the properties of homogeneous distributed neural networks in conjunction with movement (as opposed to NCAs). Therefore, I have created a system inspired by the columnar neocortex, and use the whisker barrel cortex as close inspiration. It has an architecture where identical modules process their neighborhood to classify objects. They can also move about in the sensor space, and process neighborhoods there, as seen in the figure below.  
-
-It is applied to classification, because of the connection of such a system to cortical columns and Jeff Hawkins' idea of distributed classification and voting. With some reworking, the system can be translated to an NCA like ones typically used for robot control with message passing. 
+The brain has inspired many interesting artificial intelligence (AI) systems, especially through the distributed columnar architecture of the neocortex. However, as most AI systems rely on static input, the importance of active sensing is often overlooked. In animals, sensing is an active process, where perception depends on motor control. To explore how sensorimotor control impacts behavior in classification tasks, we introduce the Active Neural Cellular Automata (ANCA), a neocortex-inspired model with movable sensors. Active sensing naturally emerges in the ANCA, with belief-informed exploration and attentive behavior to salient information, without adding explicit attention mechanisms. Active sensing both simplifies classification tasks and leads to a highly scalable system. This enables ANCAs to be smaller than the image size without losing information and enables fault tolerance to damaged sensors. Overall, our work provides insight to how distributed architectures can interact with movement, opening new avenues for adaptive AI systems in embodied agents.
 
 ![A cute rat](img/project_description.png)
-
-The fully formed system will be tested for various forms of robustness, scalability, and adaptability. I also want to test different forms of teaching the system, like input information and specific loss.
-
-The system can be used for 
-1. Investigating properties of homogeneous distributed neural network systems with and without movement for engineering
-2. ... Or for theorizing about neocortex?
-3. Potentially zero-shot scalable robot bodies for classification
-
-It's still in progress.
 
 ## Code structure
 
