@@ -17,7 +17,7 @@ def highlight_cell(x, y, ax=None, last_rect=None, **kwargs):
     # plt.imshow's (0,20) is right and (20,0) is down
     # Therefore, I switch x and y for Rectangle
     # rect = plt.Rectangle((y-.5, x-.5), 1,1, fill=False, **kwargs)
-    rect = plt.Rectangle((y - 1.5, x - 1.5), 3, 3, fill=False, **kwargs)
+    rect = plt.Rectangle((y - 1.5, x - 1.5), 3, 3, fill=False, alpha=0.4, **kwargs)
     ax = ax or plt.gca()
     ax.add_patch(rect)
     if last_rect is not None:
@@ -27,7 +27,21 @@ def highlight_cell(x, y, ax=None, last_rect=None, **kwargs):
 
 
 def animate(images, states, actions, perceptions_through_time, hidden_channels, class_channels, labels):
-    fig = plt.figure()
+    if class_channels == 10:
+        fig = plt.figure(figsize=(15, 5))
+        plt.subplots_adjust(top=0.8, bottom=0, hspace=0)
+    elif class_channels == 4:
+        fig = plt.figure(figsize=(10, 5))
+        plt.subplots_adjust(top=0.8, bottom=0, hspace=0)
+    elif class_channels == 3:
+        fig = plt.figure(figsize=(10, 5))
+        plt.subplots_adjust(top=0.8, bottom=0, hspace=0)
+    elif class_channels == 5:
+        fig = plt.figure(figsize=(10, 5))
+        plt.subplots_adjust(top=0.8, bottom=0, hspace=0)
+    else:
+        fig = plt.figure()
+
     super_ax = plt.gca()
     super_ax.axis("off")
 
@@ -45,6 +59,8 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
     else:
         im = ax_img.imshow(images[0])
     ax_img.set_title("Image")
+    ax_img.set_yticks([0, images[0].shape[0]], [0, images[0].shape[0]])
+    ax_img.set_xticks([0, images[0].shape[1]], [0, images[0].shape[1]])
 
     # Plot hidden channels
     im_hidden_list = []
@@ -53,6 +69,8 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
         im_hidden = ax_hidden.imshow(states[0, :, :, j], cmap="RdBu", vmin=-1, vmax=1)
         im_hidden_list.append(im_hidden)
         ax_hidden.set_title("Hidden\nchannel " + str(j + 1))
+        ax_hidden.set_yticks([])
+        ax_hidden.set_xticks([1, states[0].shape[1] - 2], [1, states[0].shape[1] - 2])
     # cb = plt.colorbar(im_hidden, ax=[ax_hidden], location="right")
 
     # Plot actions (always just 2)
@@ -63,15 +81,21 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
             im_action = ax_action.imshow(actions[0, :, :, j], cmap="RdBu", vmin=-0.0007, vmax=0.0007)
             im_action_list.append(im_action)
             ax_action.set_title("Up/Down" if j == 0 else "Left/Right")
+            ax_action.set_yticks([])
+            ax_action.set_xticks([1, actions[0].shape[1] - 2], [1, actions[0].shape[1] - 2])
         # cb = plt.colorbar(im_action, ax=[ax_action], location="right")
 
     # Show class channels
     im_class_list = []
+    ax_class_list = []
     for j in range(class_channels):
         ax_class = fig.add_subplot(2, max_images_on_line, 1 + max_images_on_line + j)
         im_class = ax_class.imshow(states[0, :, :, hidden_channels + j], cmap="RdBu", vmin=-1, vmax=1)
         im_class_list.append(im_class)
-        ax_class.set_title("Class " + str(labels[j]))
+        ax_class_list.append(ax_class)
+        ax_class.set_title("Class\n" + str(labels[j]))
+        ax_class.set_yticks([])
+        ax_class.set_xticks([1, states[0].shape[1] - 2], [1, states[0].shape[1] - 2])
     # cb = plt.colorbar(im_class, ax=[ax_class], location="right")
 
     # Keeping track of the little squares because they need careful attention to actually be deleted
@@ -82,7 +106,12 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
         # Set title to indicate current belief
         state = states[i]
         believed = np.argmax(np.mean(state[1:-1, 1:-1, -class_channels:], axis=(0, 1)))
-        super_ax.set_title(f"{i} Believed class: " + str(labels[believed]))
+        super_ax.set_title(
+            f"Timestep: {i}\nCurrent classification: " + str(labels[believed]),
+            pad=20,
+            ha="left",
+            x=0,
+        )
 
         # Set image, hidden channels, actions, and class channels
         im.set_array(images[i])
@@ -96,6 +125,10 @@ def animate(images, states, actions, perceptions_through_time, hidden_channels, 
 
         for j in range(class_channels):
             im_class_list[j].set_array(states[i, :, :, hidden_channels + j])
+            if believed == j:
+                ax_class_list[j].set_title("Class\n" + str(labels[j]), color="deepskyblue", weight="bold")
+            else:
+                ax_class_list[j].set_title("Class\n" + str(labels[j]), color="black")
 
         ### Update the little squares indicating perceptive fields
         perceptions = perceptions_through_time[i]
