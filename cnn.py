@@ -22,7 +22,7 @@ from tensorflow.keras import optimizers
 from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
 from tqdm import tqdm
 
-CLASSES = (0, 1, 2)
+CLASSES = (0, 1, 2, 3, 4)
 trained_image_size = 28
 img_channels = 1
 fashion = False
@@ -138,7 +138,32 @@ def plot_image_scale_always_full_size():
     plt.show()
 
 
-def plot_state_damage():
+def print_mean_score(path):
+
+    to_print = []
+    for mode, sample_number in zip(["train", "test"], [samples_per_digit, samples_per_digit_test]):
+        # Get data
+        images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=sample_number, verbose=False, test=mode == "test")
+
+        # Get scores
+        all_scores = {}
+
+        for sub_path in os.listdir(path):
+            if os.path.isdir(path + sub_path):
+                saved_model = path + sub_path + "/checkpoint_model.ckpt"
+                model = get_model(saved_model)
+
+                test_loss, test_acc = model.evaluate(images, labels)
+                all_scores[sub_path] = test_acc
+
+        to_print.append(mode.capitalize() + ": " + str(np.mean(list(all_scores.values()))))
+
+    for line in to_print:
+        print(line)
+    input()
+
+
+def plot_state_damage(silencing=True, type="square", plot=False):
     from zero_shot_damage import (
         alter_divisible,
         flip_values,
@@ -150,7 +175,7 @@ def plot_state_damage():
     )
 
     # The folder to plot from
-    path = "./experiments/cnn/mnist3/"
+    path = "./experiments/cnn/mnist10/"
 
     # Get data
     images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=40, verbose=False, test=True)
@@ -166,6 +191,10 @@ def plot_state_damage():
         if os.path.isdir(path + sub_path):
             saved_model = path + sub_path + "/checkpoint_model.ckpt"
             model = get_model(saved_model)
+
+            if silencing is False:
+                bias = model.weights[1].numpy()
+                bias_relu = tf.keras.activations.relu(bias).numpy()
 
             # Get test sizes
             _, N, M, O = model.dmodel.layers[1].input_shape
@@ -183,12 +212,22 @@ def plot_state_damage():
                     )
 
                     # Get the indexes of the feature map to silence
-                    x_indexes, y_indexes = sample_squarely(test_size, N, M)
+                    if type == "random":
+                        x_indexes, y_indexes = sample_randomly(test_size, N, M)
+                    elif type == "square":
+                        x_indexes, y_indexes = sample_squarely(test_size, N, M)
+                    else:
+                        # raise exception
+                        raise Exception(f'Invalid type "{type}"')
 
                     # Silence the feature map
                     for x in x_indexes:
                         for y in y_indexes:
-                            output[:, x - 1, y - 1, :] = 0
+                            if silencing:
+                                output[:, x - 1, y - 1, :] = 0
+                            else:
+                                # If input was 0 (no whisker), then only bias would be used, as well as relu.
+                                output[:, x - 1, y - 1, :] = bias_relu
 
                     # Run the sample through the rest of the layers
                     for layer in model.dmodel.layers[1:]:
@@ -205,20 +244,23 @@ def plot_state_damage():
             all_scores[sub_path] = accuracies
 
     # Plot
-    for key, value in all_scores.items():
-        plt.plot(test_sizes_percentages, value, label=key)
+    if plot:
+        plt.figure()
+        for key, value in all_scores.items():
+            plt.plot(test_sizes_percentages, value, label=key)
 
-    ax = plt.gca()
-    ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
-    ax.set_xticks(test_sizes_percentages, np.round(test_sizes_percentages * 100))
-    ax.set_ylabel("Retained accuracy (%)")
-    ax.set_xlabel("Randomly silenced cells (%)")
+        ax = plt.gca()
+        ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
+        ax.set_xticks(test_sizes_percentages, np.round(test_sizes_percentages * 100))
+        ax.set_ylabel("Retained accuracy (%)")
+        ax.set_xlabel("Randomly silenced cells (%)")
 
-    plt.show()
+        plt.show()
 
     # Save
     all_scores["test_sizes"] = test_sizes_percentages.tolist()
-    json.dump(all_scores, open(path + "/square_silencing_robustness.json", "w"))
+    name_add = "silencing" if silencing else "no_silencing"
+    json.dump(all_scores, open(path + f"/{type}_{name_add}_robustness.json", "w"))
 
 
 def plot_image_noise_robustness():
@@ -356,11 +398,11 @@ def main():
     # Sometimes, the path is already made. Add a unique numerical suffix
     additive = 2
     new_name = name
-    while os.path.isdir(f"./experiments/cnn/mnist3/{new_name}"):
+    while os.path.isdir(f"./experiments/cnn/mnist5/{new_name}"):
         new_name = name + "_" + str(additive)
         additive += 1
 
-    saved_model = f"./experiments/cnn/mnist3/{new_name}/checkpoint_model.ckpt"
+    saved_model = f"./experiments/cnn/mnist5/{new_name}/checkpoint_model.ckpt"
 
     # Script wide functions
     train_x, train_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit)
@@ -458,4 +500,20 @@ def find_easiest_digits():
 
 
 if __name__ == "__main__":
-    plot_image_noise_robustness()
+    """for silencing in [True, False]:
+    for type in ["square"]:
+        if silencing is True and type == "random":
+            continue
+        plot_state_damage(silencing=silencing, type=type, plot=False)"""
+
+    # main()
+
+    """saved_model = "./experiments/cnn/mnist3/10-9-24_17:10/checkpoint_model.ckpt"
+    model = get_model(saved_model)
+
+    from IPython import embed
+
+    embed()"""
+
+    path = "./experiments/cnn/mnist5/"
+    print_mean_score(path)
