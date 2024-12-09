@@ -1,12 +1,16 @@
 [TRAINING]
 
-maxgen = 20000
+maxgen = 400
 
 popsize = 30
 
-init_sigma = 0.001
+init_sigma = 0.002
 
-threads = 10
+lambda_energy = 0.0001
+
+lambda_weight = 0.0001
+
+threads = 4
 
 pool_training = False
 
@@ -19,20 +23,20 @@ predicting_method = highest_value
 
 [SCALE]
 
-train_n_neo = 16
+train_n_neo = 8
 
-train_m_neo = 16
+train_m_neo = 8
 
-test_n_neo = 16
+test_n_neo = 1
 
-test_m_neo = 16
+test_m_neo = 1
 
 
 [LOGGING]
 
-saving_interval = 100
+saving_interval = 200
 
-plotting_interval = 25
+plotting_interval = 200
 
 visualize_interval = 70000
 
@@ -43,22 +47,24 @@ mnist_digits = (0, 1, 2)
 
 samples_per_digit = 1
 
-data_func = get_simple_object
+data_func = get_test_colors_data
 
-# Size only matters if data_func = get_MNIST_data_resized or get_simple_object or get_simple_object_translated
-size = 18
+# Size if image (MNIST: 28, CIFAR: 32)
+size = 10
 
-# Colors only matters if data_func = get_CIFAR_data
-colors = False
+# Colors (MNIST: False, CIFAR: True)
+colors = True
 
 
 [NETWORK]
 
-hidden_channels = 3
+hidden_channels = 0
 
 hidden_neurons = 10
 
-img_channels = 1
+activation_function = linear
+
+img_channels = 3
 
 iterations = 50
 
