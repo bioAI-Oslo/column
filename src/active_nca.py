@@ -31,7 +31,7 @@ def layer_math(x, weight, bias):
     return x @ weight + bias
 
 
-class MovingNCA:
+class ActiveNCA:
     def __init__(
         self,
         num_hidden,
@@ -195,7 +195,7 @@ class MovingNCA:
         # I should really phase out having guesses here, I don't use it for anything... TODO
         return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
-    def classify(self, img_raw, visualize=False, step=None):
+    def classify(self, img_raw, visualize=False, step=None, correct_label_index=None):  # , silencing_indexes=None):
         """
         Classify the input image using the trained model.
 
@@ -222,6 +222,10 @@ class MovingNCA:
         for _ in range(iterations):
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
             collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo, N_active, M_active)
+
+            """if silencing_indexes is not None:
+                for i, j in zip(silencing_indexes[0], silencing_indexes[1]):
+                    input[i * N_neo + j] = 0"""
 
             # guesses = tf.stop_gradient(self.dmodel(input)) # This doesn't make a difference
             guesses = self.dmodel(input)
@@ -254,6 +258,7 @@ class MovingNCA:
                 self.num_hidden,
                 self.num_classes,
                 self.labels,
+                correct_label_index,
             )
             self.images = None
             self.states = None
@@ -263,7 +268,15 @@ class MovingNCA:
         return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
     def visualize(
-        self, images, states, actions, perceptions_through_time, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS
+        self,
+        images,
+        states,
+        actions,
+        perceptions_through_time,
+        HIDDEN_CHANNELS,
+        CLASS_CHANNELS,
+        MNIST_DIGITS,
+        correct_label_index,
     ):
         # It's slower, however the animate function spawns many objects and leads to memory leaks. By using the
         # function in a new process, all objects should be cleaned up at close and the animate function
@@ -274,7 +287,16 @@ class MovingNCA:
 
         p = mp.Process(
             target=animate,
-            args=(images, states, actions, perceptions_through_time, HIDDEN_CHANNELS, CLASS_CHANNELS, MNIST_DIGITS),
+            args=(
+                images,
+                states,
+                actions,
+                perceptions_through_time,
+                HIDDEN_CHANNELS,
+                CLASS_CHANNELS,
+                MNIST_DIGITS,
+                correct_label_index,
+            ),
         )
         p.start()
         p.join()
@@ -296,7 +318,7 @@ class MovingNCA:
         labels=None,
         activation=None,
     ):
-        network = MovingNCA(
+        network = ActiveNCA(
             num_hidden=num_hidden,
             hidden_neurons=hidden_neurons,
             img_channels=img_channels,
