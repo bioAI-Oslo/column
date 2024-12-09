@@ -1,3 +1,10 @@
+"""
+Train a CNN on current data_func. The data_func should be one of the functions in src/data_processing.py
+Various test functions are also included
+
+This is the main CNN file.
+"""
+
 import functools
 import json
 import os
