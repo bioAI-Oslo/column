@@ -17,15 +17,23 @@ sns.set()
 
 ################################ GLOBALS ################################
 
-path = "./experiments/fashion_final"
+path = "./experiments/cifar4_final15"
 
 # Detect difference
-feature1, feature2 = "network.hidden_channels", "scale.train_n_neo"
+feature1, feature2 = "scale.train_n_neo", "training.lambda_weight"
 
 ################################ FUNCTIONS ################################
 
 
 def sort_features(feature_list):
+    """Sorts a list of features. If it contains only strings or None, sorts these lexicographically. If it contains other types, converts to numpy array first.
+
+    Args:
+        feature_list (list): List of features to sort.
+
+    Returns:
+        list or numpy.ndarray: Sorted list of features.
+    """
     print(feature_list)
     try:
         feature_list = np.sort(feature_list)
@@ -40,7 +48,22 @@ def sort_features(feature_list):
 
 
 def get_features(path, feature1, feature2):
-    """Gets lists over values the features can have"""
+    """
+    Retrieves two lists of unique features from all the subfolders in path.
+
+    The two features are given by feature1 and feature2. If the same feature is
+    used in two different subfolders, it is only added once to the list.
+
+    The lists are then sorted in-place with sort_features for nicer plotting.
+
+    Args:
+        path (str): Path to folder containing all subfolders with the features.
+        feature1 (str): Feature to retrieve. Should be a valid attribute of config.
+        feature2 (str): Feature to retrieve. Should be a valid attribute of config.
+
+    Returns:
+        tuple: Two lists of unique features, sorted in-place.
+    """
     feature1_list = []
     feature2_list = []
 
@@ -69,23 +92,41 @@ def get_features(path, feature1, feature2):
 
 
 def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
+    """
+    Plot a heatmap from a numpy array heatmap. The heatmap is annotated with the
+    values from the array. The x and y axes are labeled with the values from the
+    lists feature1 and feature2. The title of the plot is set to title.
+
+    Args:
+        heatmap (numpy.ndarray): The array to plot as a heatmap.
+        title (str): The title of the plot.
+        feature1 (list): The values to label the y-axis with.
+        feature2 (list): The values to label the x-axis with.
+        high_is_worse (bool, optional): If True, the colors of the heatmap will be reversed.
+            This is useful for plotting tuning results where higher values are
+            worse. Defaults to False.
+    """
     plt.title(title)
+    # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
     colors = [
         "#2C2463",
         "#DC267F",
         "#EF792A",
         "#FFD958",
-    ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
+    ]
     if high_is_worse:
         colors.reverse()
+    # Making a colormap with those colors
     cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
+
+    # Plotting
     if high_is_worse:
         sns.heatmap(heatmap, annot=True, cmap=cmap, square=True)
     else:
         sns.heatmap(heatmap, annot=True, cmap=cmap, square=True, vmin=0, vmax=1)
 
     # Lists should be sorted already, so this becomes pretty
-    plt.yticks(np.arange(len(feature1_list)) + 0.5, feature1_list)
+    plt.yticks(np.arange(len(feature1_list)) + 0.5, feature1_list)  # +0.5 to center
     plt.xticks(np.arange(len(feature2_list)) + 0.5, feature2_list)
 
     # Prettier labels made with regex
@@ -96,25 +137,43 @@ def plot_heatmap(heatmap, title, feature1, feature2, high_is_worse=False):
 
 
 def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=False):
+
     # cmap and count_lines will help with color for the lines
     # cmap = plt.cm.plasma
-    cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
-        "", ["#7597FF", "#6A52DC", "#DC267F", "#FFB000"]
-    )  # Modified IBM design library palette
-    """cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
-        "", colors=["#32239C", "#DC267F", "#EF6337", "#F3B320"]
-    )  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)"""
+    """
+    Plots convergence plots for given features and parameters.
 
+    Args:
+        convergence (list): A 4D list containing convergence data for different
+            combinations of features. Each element is a list of lists representing
+            different runs.
+        title (str): The title of the plot.
+        ylabel (str): The label for the y-axis.
+        yticks (tuple, optional): A tuple containing the y-tick positions and labels.
+            Defaults to None.
+        smoothing (bool, optional): If True, applies smoothing to the convergence lines.
+            Defaults to False.
+
+    The plot will display the mean and standard deviation of the convergence data
+    across runs, with lines colored based on a colormap. The x-axis represents the
+    generation number.
+    """
+    # Modified IBM design library palette
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ["#7597FF", "#6A52DC", "#DC267F", "#FFB000"])
+
+    # Counting the number of lines
     count_lines = sum(1 for row in convergence for sublist in row if sublist)
 
     plt.figure()
     plt.title(title)
     count_plotted = 0  # For keeping track of which color to use
 
+    # Going through the matrix of features
     for i in range(len(feature1_list)):
         for j in range(len(feature2_list)):
+            # Skip if there is no data
             if convergence[i][j] == []:
-                continue  # Skip if there is no data
+                continue
 
             # While generating the data, runs might not be completed, and we wait until the last run is completed before plotting the full line
             max_length = np.inf
@@ -136,18 +195,26 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=Fa
                 mean = smooth_line(smoothing_factor, mean)
                 std = smooth_line(smoothing_factor, std)
 
+            # Which color to use?
             color = cmap(0.5 if count_lines == 1 else count_plotted / (count_lines - 1))
+
+            # Debugging info
             print(feature1, feature2, type(feature1_list[i]), type(feature2_list[j]))
+
+            # Special case for network.moving and network.position
             if feature1 == "network.moving" and feature2 == "network.position":
-                print("We're here")
                 cmap_pos = 2 if feature1_list[i] == True else 0
                 cmap_pos += 1 if feature2_list[j] == None else 0
                 color = cmap(cmap_pos / 3)
 
+            # Plot shaded area
             plt.fill_between(x_axis[i][j][0][:max_length], mean - std, mean + std, color=color, alpha=0.5)
 
+            # Pretty labels
             feature1_name = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
             feature2_name = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
+
+            # Plot the line
             plt.plot(
                 x_axis[i][j][0][:max_length],
                 mean,
@@ -166,7 +233,26 @@ def plot_convergence_plots(convergence, title, ylabel, yticks=None, smoothing=Fa
 
 def plot_convergence_plots_total(convergence, title, ylabel, yticks=None):
     # cmap and count_lines will help with color for the lines
+    """
+    Plot multiple convergence plots for different combinations of features.
+
+    Args:
+        convergence (list): A 4D list containing convergence data for different
+            combinations of features. Each element is a list of lists representing
+            different runs.
+        title (str): The title of the plot.
+        ylabel (str): The label for the y-axis.
+        yticks (tuple, optional): A tuple containing the y-tick positions and labels.
+            Defaults to None.
+
+    The plot will display the convergence data across runs, with lines colored based
+    on a colormap. The x-axis represents the generation number. The convergence data
+    is split into subplots for each combination of features.
+    """
+    # Just using plasma cmap, this is just for me
     cmap = plt.cm.plasma
+
+    # Counting the number of lines
     count_lines = sum(1 for row in convergence for sublist in row if sublist)
 
     plt.figure()
@@ -175,24 +261,30 @@ def plot_convergence_plots_total(convergence, title, ylabel, yticks=None):
 
     N, M = len(feature1_list), len(feature2_list)
 
+    # Going through the matrix of features
     for i in range(N):
         for j in range(M):
+            # Skip if there is no data
             if convergence[i][j] == []:
-                continue  # Skip if there is no data
+                continue
 
+            # Which color to use?
             color = cmap(count_plotted / count_lines)
 
             plt.subplot(N, M, i * M + j + 1)
 
+            # Plot the line for each run for this set of features
             for k, line in enumerate(convergence[i][j]):
                 plt.plot(x_axis[i][j][k], line, color=color)
 
+            # Pretty labels, not used currently
             feature1_name = re.sub("[a-z]+\.", "", feature1).replace("_", " ").title()
             feature2_name = re.sub("[a-z]+\.", "", feature2).replace("_", " ").title()
 
             ax = plt.gca()
             ax.set_title(str(feature1_list[i]) + " " + str(feature2_list[j]))
 
+            # Put axes labels only at edges
             if i == N - 1:
                 ax.set_xlabel("Generation")
             if j == 0:
@@ -205,7 +297,20 @@ def plot_convergence_plots_total(convergence, title, ylabel, yticks=None):
 
 
 def mean_across_inhomogeneous_dimensions(input_array: list):
-    """Mean across inhomogeneous dimensions. Numpy doesn't like to do this, so I do it myself"""
+    # Mean across inhomogeneous dimensions. Numpy doesn't like to do this, so I do it myself
+    """
+    Takes a 3D list of lists, and returns the mean across each of the inner lists.
+    This is useful for taking the mean across inhomogeneous arrays, which numpy
+    doesn't support.
+
+    Args:
+        input_array (list): A 3D list of lists.
+
+    Returns:
+        means (numpy.ndarray):
+            A 2D array of the same shape as input_array, where each element is the
+            mean of the corresponding element in input_array.
+    """
     N, M = len(input_array), len(input_array[0])
     means = np.zeros((N, M))
     for x in range(N):
@@ -216,6 +321,19 @@ def mean_across_inhomogeneous_dimensions(input_array: list):
 
 
 def get_keys(feature1, feature2, feature1_list, feature2_list):
+    """
+    Return the indices of the given features in the feature lists.
+
+    Args:
+        feature1 (str): The name of the first feature.
+        feature2 (str): The name of the second feature.
+        feature1_list (list): The list of values of the first feature.
+        feature2_list (list): The list of values of the second feature.
+
+    Returns:
+        tuple: A tuple of two integers, the first representing the index of feature1 in feature1_list, and the second representing the index of feature2 in feature2_list.
+    """
+
     def get_key(feature, feature_list):
         feature_eval = eval(f"config.{feature}")
         print(feature_eval)
@@ -255,6 +373,7 @@ for sub_folder in os.listdir(path):
         key0, key1 = get_keys(feature1, feature2, feature1_list, feature2_list)
 
         # Add data to heatmap based on key
+        # Use the last 10 samples for mean because optimization is highly stochastic
         heatmap_loss_train[key0][key1].append(np.mean(data["test_loss_train_size"][-10:]))
         heatmap_loss_test[key0][key1].append(np.mean(data["test_loss_test_size"][-10:]))
 
