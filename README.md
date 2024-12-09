@@ -39,7 +39,7 @@ Code mainly produced by: Mia-Katrin Kvalsund
 Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellular Robot Substrate](https://github.com/sidneyp/neural-cellular-robot-substrate)
 
 ## The folder structure:
-´´´python
+```python
 .
 ├── experiments                                  Example experiment folder
 │   ├── anca_run_folder                          ANCA superfolders (per experiment)
@@ -80,5 +80,5 @@ Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellu
 ├── zero_shot_damage.py                          Used to test fault tolerance/robustness
 ├── zero_shot_robustness_vs_scalability.py       Used to plot robustness versus scalability
 └── zero_shot_scalability.py                     Used to test scalability
-´´´
+```
 
