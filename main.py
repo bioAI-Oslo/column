@@ -1,3 +1,7 @@
+"""
+This is the main file, where the ActiveNCA is trained and tested. You can also use it to visualize episodes
+"""
+
 # Numpy uses a lot of threads when running in parallel.
 # This didn't play well with multiprocessing and slurm.
 # Set OPENBLAS_NUM_THREADS=1 to reduce numpy threads to 1 for increased speed.
@@ -30,6 +34,24 @@ if deterministic:
 
 
 def get_from_config(config):
+    """
+    Given a config object, this function returns a dictionary of keyword arguments for the
+    moving NCA, the loss function, the predicting method, the data function and the data function
+    kwargs. This is used to create a set of keyword arguments for the moving NCA and the data
+    function to be used in train and test functions.
+
+    Args:
+        config (Config): The configuration object
+
+    Returns:
+        dict: A dictionary of keyword arguments for the moving NCA
+        function: The loss function to be used
+        function: The predicting method to be used
+        function: The data function to be used
+        dict: A dictionary of keyword arguments for the data function
+    """
+    # These local imports are also to avoid these imports when running in parallel
+    # Although these might not have to be here, maybe they could've been at the top
     from src.data_processing import (
         get_alternating_pattern,
         get_CIFAR_data,
@@ -108,7 +130,16 @@ def get_from_config(config):
 
 
 def scale_loss(loss, datapoints):
-    # Batch approved
+    """
+    Scale loss by the number of datapoints in the minibatch. Batch approved.
+
+    Args:
+        loss (float): The loss to be scaled.
+        datapoints (int): The number of datapoints in the minibatch.
+
+    Returns:
+        float: The scaled loss.
+    """
     return loss / datapoints
 
 
@@ -129,9 +160,36 @@ def evaluate_nca_batch(
     stable=False,
     return_confusion=False,
 ):
+    """
+    Evaluate the ActiveNCA for a set of given weights, for a whole minibatch of datapoints.
+    Classify batch is used, the faster version.
+
+    Args:
+        flat_weights (np.ndarray): The flattened weights of the network to be evaluated.
+        training_data (np.ndarray): The input data to be used for evaluation, of shape (n_samples, N, M, n_channels).
+        target_data (np.ndarray): The true labels for the input data.
+        moving_nca_kwargs (dict): The keyword arguments to be used for the ActiveNCA.
+        loss_function (function): The loss function to be used.
+        predicting_method (function): The predicting method to be used.
+        verbose (bool, optional): Whether to print the accuracy. Defaults to False.
+        visualize (bool, optional): Whether to visualize the ActiveNCA. Defaults to False.
+        N_neo (int, optional): The number of neurons in the x direction. Defaults to None.
+        M_neo (int, optional): The number of neurons in the y direction. Defaults to None.
+        return_accuracy (bool, optional): Whether to return the accuracy. Defaults to False.
+        pool_training (bool, optional): Whether to use a pool for training. Defaults to False, should not be True for this function.
+        stable (bool, optional): Whether the ActiveNCA should be stable. Stable training just applies the loss more often. Defaults to False.
+        return_confusion (bool, optional): Whether to return the confusion matrix. Defaults to False.
+
+    Returns:
+        float: The loss of the ActiveNCA.
+        float: The accuracy of the ActiveNCA, if return_accuracy is True.
+        np.ndarray: The confusion matrix of the ActiveNCA, if return_confusion is True.
+    """
     if stable:
+        # Get number of steps, after each the loss will be applied
         steps = moving_nca_kwargs["iterations"]
     else:
+        # Steps is otherwise 1, so loss will only be applied once
         steps = 1
 
     # Getting network
@@ -143,11 +201,13 @@ def evaluate_nca_batch(
 
     loss = 0
     for step in range(steps):
+        # All images are classified at once, with respective substrates and perception matrices
         class_predictions, _ = network.classify_batch(training_data, visualize=False, step=step if stable else None)
 
         # Get loss
         loss += loss_function(class_predictions, None, target_data)
 
+    # Normalize loss if stable, otherwise does nothing (division by 1)
     loss /= steps
 
     # Calculate and return accuracy if wanted
@@ -192,29 +252,65 @@ def evaluate_nca(
     stable=False,
     return_confusion=False,
 ):
+    """
+    Evaluate the ActiveNCA for a set of given weights, for a whole minibatch of datapoints.
+    Classify single is used, the slower version. Now it can be trained with a pool, and it can be visualized.
+
+    To visualize, args.vis_num needs to be available, and this is only available from main, typically.
+
+    Args:
+        flat_weights (np.ndarray): The flattened weights of the network to be evaluated.
+        training_data (np.ndarray): The input data to be used for evaluation, of shape (n_samples, N, M, n_channels).
+        target_data (np.ndarray): The true labels for the input data.
+        moving_nca_kwargs (dict): The keyword arguments to be used for the ActiveNCA.
+        loss_function (function): The loss function to be used.
+        predicting_method (function): The predicting method to be used.
+        verbose (bool, optional): Whether to print the accuracy. Defaults to False.
+        visualize (bool, optional): Whether to visualize the ActiveNCA. Defaults to False.
+        N_neo (int, optional): The number of neurons in the x direction. Defaults to None.
+        M_neo (int, optional): The number of neurons in the y direction. Defaults to None.
+        return_accuracy (bool, optional): Whether to return the accuracy. Defaults to False.
+        pool_training (bool, optional): Whether to use a pool for training. Defaults to False.
+        stable (bool, optional): Whether the ActiveNCA should be stable. Stable training just applies the loss more often. Defaults to False.
+        return_confusion (bool, optional): Whether to return the confusion matrix. Defaults to False.
+
+    Returns:
+        float: The loss of the ActiveNCA.
+        float: The accuracy of the ActiveNCA, if return_accuracy is True.
+        np.ndarray: The confusion matrix of the ActiveNCA, if return_confusion is True.
+    """
     if stable:
+        # Get number of steps, after each the loss will be applied
         steps = moving_nca_kwargs["iterations"]
     else:
+        # Steps is otherwise 1, so loss will only be applied once
         steps = 1
 
     network = ActiveNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
+    # Initialize confusion matrix
     if return_confusion:
         conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.float32)
 
     loss = 0
     accuracy = 0
     visualized = 0
+    # For each data sample, classify
     for sample, (img_raw, expected) in enumerate(zip(training_data, target_data)):
+        # Network should always be reset, but when training with pool it should only be reset every other time
         if not pool_training or sample % 2 == 0:
             network.reset()
 
+        # Print debugging info
         if visualize and (visualized < args.vis_num):
             print("Correct:", moving_nca_kwargs["labels"][np.argmax(expected)])
 
+        # Classify
         for step in range(steps):
+            # Should the step be visualized
             visualize_step = visualize and (visualized < args.vis_num)
 
+            # Classify
             class_predictions, guesses = network.classify(
                 img_raw,
                 visualize=visualize_step,
@@ -222,11 +318,13 @@ def evaluate_nca(
                 correct_label_index=np.argmax(expected) if visualize_step else None,
             )
 
+            # Successful visualization
             if visualize_step and step == steps - 1:
                 visualized += 1
 
             loss += loss_function(class_predictions, guesses, expected)
 
+        # Print debugging info, and calculate accuracy
         if verbose or return_accuracy:
             belief = np.mean(class_predictions, axis=(0, 1))
             believed = predicting_method(class_predictions)
@@ -238,13 +336,17 @@ def evaluate_nca(
             if return_confusion:
                 conf_matrix[actual, believed] += 1
 
+    # Accuracy is only normalized by batch size because it is not collected over "steps"
     if return_accuracy:
         accuracy /= training_data.shape[0]
 
     if verbose:
         print("Accuracy:", np.round(accuracy * 100, 2), "%")
 
+    # Scale loss by batch size and number of steps
     scaled_loss = scale_loss(loss, training_data.shape[0] * steps)
+
+    # Return loss, and accuracy if requested, and confusion matrix if requested
     if return_confusion and return_accuracy:
         return scaled_loss, accuracy, conf_matrix
     elif return_confusion:
@@ -266,6 +368,38 @@ def run_optimize(
     sub_folder=None,
     evaluate_method=evaluate_nca,
 ):
+    """
+    This function is the main function for training ActiveNCA.
+    It returns the best solution found by the optimization algorithm,
+    which is a cma.CMAEvolutionStrategy.
+
+    The function first prints the number of weights in the model, then
+    initializes the ES with the given parameters. It then starts a loop over the
+    range of generations, where each generation consists of generating a new set
+    of candidate solutions using the ES, evaluating each candidate solution using
+    the given loss function and predicting method, and then using the results to
+    update the ES.
+
+    The function also allows for plotting and visualization of the results. It
+    checks if the generation is divisible by the plotting interval, and if so,
+    it plots the current best solution and the bestever solution. It also checks
+    if the generation is divisible by the saving interval, and if so, it saves
+    the current best solution and the bestever solution.
+
+    Args:
+        config (localconfig.config): The configuration object.
+        moving_nca_kwargs (dict): The keyword arguments for the moving NCA.
+        loss_function (function): The loss function to use.
+        predicting_method (function): The predicting method to use.
+        data_func (function): The function to generate data with.
+        data_kwargs (dict): The keyword arguments for the data function.
+        continue_path (str, optional): The path to continue from. If not given, a new optimization run is started.
+        save (bool, optional): Whether to save the results. If not given, the results are not saved.
+        sub_folder (str, optional): The subfolder to save the results in. If not given, the results are saved in the default subfolder.
+
+    Returns:
+        list: The best solution found by the optimization algorithm.
+    """
     import cma
 
     # Print amount of weights
@@ -274,25 +408,26 @@ def run_optimize(
     )
     print("\nWeights:", int(weight_amount), "\n")
 
-    # Init solution for the ES to initialize
+    # Init solution for the ES to initialize, or load from checkpoint
     init_sol = None
     if continue_path is not None:
         init_sol = Logger.load_checkpoint(continue_path)
     else:
         init_sol = int(weight_amount) * [0.0]
 
-    es = cma.CMAEvolutionStrategy(init_sol, config.training.init_sigma)  # 0.001
+    es = cma.CMAEvolutionStrategy(init_sol, config.training.init_sigma)
     if deterministic:
         # CMAEvolutionStrategy does not allow you to set seed in any normal way
         # So I set it here
         np.random.seed(0)
 
+    # Probably not needed, but I had issues with garbage collection on cluster, so just in case!
     weight_amount = None
     init_sol = None
 
-    # Init logger
+    # Init logger, or load from checkpoint
     logger_object = None
-    generation_numbers = None
+    generation_numbers = None  # Range of generations to run (f.ex 0-100, 100-200, etc.)
     if continue_path is not None:
         logger_object = Logger.continue_run(config, continue_path, save=save)
         start_point = logger_object.data["x_axis"][-1]
@@ -306,14 +441,15 @@ def run_optimize(
     if config.training.threads > 1:
         print("We're starting pools with", config.training.threads, "threads")
         mp.set_start_method("spawn")
-        pool = mp.Pool(config.training.threads)  # , maxtasksperchild=10)
+        pool = mp.Pool(config.training.threads)
 
     # Record bestever solution
-    bestever_score = np.inf
+    bestever_score = np.inf  # Lower is better, so worst possible is infinity
     bestever_weights = None
 
     # Start optimization
-    try:
+    try:  # Try that only catches KeyboardInterrupt, not other exceptions. Just because it's nice when debugging to be able to quit the program with ctrl+c
+        # Print buffer to not overwhelm logs on cluster
         print_buffer = []
 
         start_run_time = time.time()
@@ -393,8 +529,10 @@ def run_optimize(
 
                 loss_test_size, acc_test_size = evaluate_method(winner_flat, **eval_kwargs)
 
+                # Again, probably not needed, but again just for ease of garbage collection
                 testing_data, target_data_test = None, None
 
+                # Do we need to store plotting data?
                 if g % config.logging.plotting_interval == 0:
                     logger_object.store_plotting_data(
                         solutions_fitness,
@@ -453,6 +591,12 @@ def run_optimize(
 
 def parse_args():
     # Parse arguments
+    """
+    Parse the arguments given to the program.
+
+    Returns:
+        argparse.Namespace: An object with all the parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="Main",
         description="This program runs an optimization.",
@@ -530,6 +674,7 @@ if __name__ == "__main__":
 
     moving_nca_kwargs, loss_function, predicting_method, data_func, kwargs = get_from_config(config)
 
+    # Dynamically change if we use the fast or slow function
     if config.training.pool_training or args.visualize:
         evaluate_method = evaluate_nca
     else:
@@ -553,13 +698,16 @@ if __name__ == "__main__":
         winner_flat = Logger.load_checkpoint(args.test_path)
 
     # Get test data for new evaluation
-    kwargs["SAMPLES_PER_CLASS"] = 500
-
+    kwargs["SAMPLES_PER_CLASS"] = 1
     kwargs["test"] = True
+
+    # Seeds for testing?
     np.random.seed(42)  # 24 for  fashion # 42 for MNIST and CIFAR
     import random
 
     random.seed(42)
+
+    # Get test data
     training_data, target_data = data_func(**kwargs)
 
     print("\nEvaluating winner:")
@@ -573,8 +721,8 @@ if __name__ == "__main__":
         verbose=False,
         visualize=args.visualize,
         return_accuracy=True,
-        N_neo=config.scale.train_n_neo,
-        M_neo=config.scale.train_m_neo,
+        N_neo=config.scale.train_n_neo,  # NB: Evaluates on train size
+        M_neo=config.scale.train_m_neo,  # NB: Evaluates on train size
         return_confusion=True,
         pool_training=config.training.pool_training,
         stable=config.training.stable,
@@ -592,6 +740,7 @@ if __name__ == "__main__":
         plt.ylabel("Real")
         plt.xlabel("Predicted")
 
+        # Below is the code I used to plot an ordered version of the confusion matrix for Fashion-MNIST
         """new_ordering = [3, 0, 2, 4, 6, 8, 1, 5, 7, 9]
 
         new_conf = np.zeros((10, 10))
