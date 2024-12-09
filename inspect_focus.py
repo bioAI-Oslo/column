@@ -17,362 +17,531 @@ from src.plotting_utils import get_plotting_ticks
 NUM_DATA = 1  # How many images to classify and visualize
 
 # Network to use, specified by sub_path:
-# sub_path = "experiments/simple_object_moving/18-7-24_12:4_10" # Random network for simple object
-# sub_path = "experiments/simple_pattern/16-7-24_15:33_2" # Random network for simple pattern
-# sub_path = "experiments/cifar4_color_tuning3/20-9-24_14:53" # Cool cifar network
-# sub_path = "experiments/fashion_final/17-9-24_0:28"  # Best fashion 10 class network
-# sub_path = "experiments/fashion_final/17-9-24_15:21"  # Another good fashion 10 class network
-# sub_path = "experiments/cifar4_color_tuning4/1-10-24_11:23"
 
-# MNIST 10
-sub_path = "experiments/mnist10_final/11-9-24_9:45"  # Best Mnist 10 class network
+# Simple pattern
+# sub_path = "experiments/simple_pattern/16-7-24_15:33_2"  # Random network used in article
+
+# Simple object
+# sub_path = "experiments/simple_object_moving/18-7-24_12:4_10"  # Random network used in article
+
+# MNIST 5 class
+# sub_path = "experiments/mnist_final15/28-9-24_13:53"  # Best performer MNIST final 15x15 and 5 class
+# sub_path = "experiments/mnist_final/20-8-24_11:51"  # Best performer MNIST final 7x7 and 5 class
+# sub_path = "experiments/mnist_final15_2:40/25-7-24_9:51"  # Best performer MNIST final 15x15 and 5 class 2 hc 40 hn
+
+# MNIST 10 class 7x7
+# sub_path = "experiments/mnist10_final/11-9-24_9:45"  # Best Mnist 10 class network
 # sub_path = "experiments/mnist10_final/10-9-24_9:13_2"
 # sub_path = "experiments/mnist10_final/6-9-24_10:29"
 # sub_path = "experiments/mnist10_final/5-9-24_12:5"
-# sub_path = "experiments/mnist10_final/9-9-24_11:22"
+# sub_path = "experiments/mnist10_final/9-9-24_11:22"  # 2nd best
 # sub_path = "experiments/mnist10_final/10-9-24_9:13"
 # sub_path = "experiments/mnist10_final/2-9-24_15:10"
+
+# MNIST 10 class 15x15
+# sub_path = "experiments/mnist10_final15/30-9-24_9:26"
+
+# FASHION MNIST 10 class 7x7
+# sub_path = "experiments/fashion_final/17-9-24_0:28"  # Best fashion 10 class network
+
+# FASHION MNIST 10 class 15x15
+# sub_path = "experiments/fashion_final15/26-9-24_13:46_3"  # Best fashion 10 class network
+# sub_path = "experiments/fashion_final15/26-9-24_13:46"  # 2nd best
+# sub_path = "experiments/fashion_final15/26-9-24_13:46_2"  # 3rd best
+# sub_path = "experiments/fashion_final15/26-9-24_13:46_4"  # 4th best
+
+
+# CIFAR 4 class
+sub_path = "experiments/cifar4_final15/6-10-24_13:23_2"  # Best CIFAR 4 class
+# sub_path = "experiments/cifar4_final15/6-10-24_13:24"  # 2nd best
+# sub_path = "experiments/cifar4_final15/6-10-24_13:24_2"  # 3rd best
 
 ############################################################################
 
 
-def get_frequency(network, x_data_i, count=False, area=False):
-    frequencies = np.zeros((*x_data_i.shape[:2], 1))
+def get_data(network, x_data_i):
+    """
+    Get the perception positions and network classifications for a single data point/image.
+
+    Args:
+        network (ActiveNCA): The network to use.
+        x_data_i (np.ndarray): The data point/image to classify.
+
+    Returns:
+        np.ndarray: The perception positions after each iteration.
+        np.ndarray: The network classifications after each iteration.
+    """
+    # Network should always be reset before use on one datapoint to null the internal state
+    network.reset()
+
+    # Initialize arrays to store perception positions and network classifications
+    perception_positions = np.zeros((network.iterations + 1, *network.perceptions.shape))
+    network_classifications = np.zeros((network.iterations + 1, *network.state.shape[:-1], network.num_classes))
+
+    # Run a classification loop using steps
+    for step in range(network.iterations):
+        # Save before to get the initial
+        perception_positions[step, :, :, :] = deepcopy(network.perceptions)
+        network_classifications[step, :, :, :] = deepcopy(network.state[:, :, -network.num_classes :])
+
+        # Progress episode
+        _, _ = network.classify(x_data_i, step=step)
+
+    # Save final (these values are technically never used in an episode)
+    perception_positions[-1, :, :, :] = deepcopy(network.perceptions)
+    network_classifications[-1, :, :, :] = deepcopy(network.state[:, :, -network.num_classes :])
+
+    # Make sure to only return active part of substrate (so removing the pixels at the edges)
+    return perception_positions, network_classifications[:, 1:-1, 1:-1, :]
+
+
+def get_pixel_occupacy(perceptions, x_data_i, count=False, area=False):
+    """
+    Calculate the frequency of every pixel in an image being occupied by a perception field.
+
+    Args:
+        perceptions (list of lists of tuples): The positions of the perception fields after each iteration.
+        x_data_i (np.ndarray): The image to get the pixel frequencies from.
+        count (bool): Whether to count how many times each pixel is occupied, or just mark it as occupied.
+        area (bool): Whether to count the area of the perception field as occupied, or just the single pixel in the center.
+
+    Returns:
+        np.ndarray: The frequency of every pixel in the image being occupied.
+    """
+    frequencies = np.zeros([*x_data_i.shape[:-1]])
 
     # For every field, record position as visited by putting a 1 there
-    for row in network.perceptions:
+    for row in perceptions:
         for x, y in row:
+            # For neighborhood
             for i in range(0, 1 + 2 * int(area)):
                 for j in range(0, 1 + 2 * int(area)):
                     if count:
-                        frequencies[x + i, y + j] += 1
+                        frequencies[int(x) + i, int(y) + j] += 1
                     else:
-                        frequencies[x + i, y + j] = 1
+                        frequencies[int(x) + i, int(y) + j] = 1
 
     return frequencies
 
 
-def get_movement(network, x_data_i, movement_iterations=1):
-    # Network should always be reset before use on one datapoint to null the internal state
-    network.reset()
+def get_episode_pixel_occupacy(perception_positions, x_data_i, iterations=1, count=False, area=False):
+    """
+    Calculate the frequency of every pixel in an image being occupied by a perception field over all iterations of an episode.
 
-    positions = np.zeros((network.iterations // movement_iterations, *network.perceptions.shape))
-    movements = np.zeros((network.iterations // movement_iterations, *network.perceptions.shape))
+    Args:
+        perception_positions (list of lists of tuples): The positions of the perception fields after each iteration in an episode.
+        x_data_i (np.ndarray): The image to get the pixel frequencies from.
+        iterations (int): How many iterations to skip between each calculation of pixel occupacy.
+        count (bool): Whether to count how many times each pixel is occupied, or just mark it as occupied.
+        area (bool): Whether to count the area of the perception field as occupied, or just the single pixel in the center.
 
-    for step in range(network.iterations // movement_iterations):
-        prev_pos = deepcopy(network.perceptions)
+    Returns:
+        list of np.ndarrays: The frequency of every pixel in the image being occupied for every iteration in the episode.
+    """
+    # Initialize array to store pixel occupacy per timestep
+    pixel_occupacy = []
 
-        positions[step, :, :, :] = prev_pos
+    # For every timestep (sampled at every other iteration, specified by "iterations")
+    for step in range(0, len(perception_positions), iterations):
+        # Get pixel occupacy
+        pixel_occupacy.append(
+            get_pixel_occupacy(
+                perception_positions[step],
+                x_data_i,
+                count=count,
+                area=area,
+            )
+        )
 
-        for int_step in range(movement_iterations):
-            _, _ = network.classify(x_data_i, step=step * movement_iterations + int_step)
-
-        movements[step, :, :, :] = deepcopy(network.perceptions) - prev_pos
-
-    return movements, positions
-
-
-def get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10, count=False, area=False):
-    frequencies_list = []
-    individual_beliefs = []
-
-    # Network should always be reset before use on one datapoint to null the internal state
-    network.reset()
-    for step in range(network.iterations // frequency_iterations):
-        # At what rate we'll plot, f.ex plot every 10 iterations
-
-        # Get visitation frequency of pixels
-        frequencies = get_frequency(network, x_data_i, count=count, area=area)
-        frequencies_list.append(deepcopy(frequencies))  # Don't think I have to deepcopy here, but... it doesn't hurt
-
-        # Now run the network while recording the beliefs
-        for int_step in range(frequency_iterations):
-            class_predictions, _ = network.classify(x_data_i, step=step * frequency_iterations + int_step)
-
-            beliefs = np.zeros((class_predictions.shape[-1]))  # Number of classes
-            for x in range(class_predictions.shape[0]):
-                for y in range(class_predictions.shape[1]):
-                    # Count networks that most believe the class
-                    beliefs[np.argmax(class_predictions[x, y])] += 1  # This one for prediction belief
-                    """beliefs += (
-                        np.exp(class_predictions[x, y]) / tf.reduce_sum(np.exp(class_predictions[x, y])).numpy()
-                    )"""  # This one for softmax belief
-
-            individual_beliefs.append(beliefs)
-
-    # Get visitation frequency of pixels
-    # Note: These field positions are the 50th timestep, and hasn't been trained for. Consider plotting the 49th instead.
-    frequencies = get_frequency(network, x_data_i, count=count, area=area)
-    frequencies_list.append(deepcopy(frequencies))
-
-    return frequencies_list, individual_beliefs
+    return pixel_occupacy
 
 
-def plot_frequencies_and_beliefs(frequencies_list, individual_beliefs, x_data_i, y_data_i, iterations, labels):
-    plt.figure()
+def get_movement(perception_positions, x_data_i, iterations=1):
+    """
+    Calculate the movement of every perception field between every iteration in an episode.
 
-    rows = 2
+    Args:
+        perception_positions (list of lists of tuples): The positions of the perception fields after each iteration in an episode.
+        x_data_i (np.ndarray): The image to get the pixel frequencies from. Not used.
+        iterations (int): How many iterations to skip between each calculation of pixel occupacy.
 
-    # We start by plotting the original image with the fields on top for a few selected timesteps
+    Returns:
+        np.ndarray: The movement of every perception field between every iteration in the episode.
+    """
+    # Initialize array to store movements per timestep
+    movements = np.zeros(((len(perception_positions) - 1) // iterations, *perception_positions.shape[1:]))
 
-    for i, frequencies in enumerate(frequencies_list):
-        # Constructing the appropriate "plt.subplot(121)" string and then turning it to int"
-        plt.subplot(int(str(rows) + str(len(frequencies_list)) + str(1 + i)))
+    # For every timestep (sampled at every other iteration, specified by "iterations")
+    for step in range(0, (len(perception_positions) - 1) // iterations):
+        # Movement is position after - position before
+        movements[step, :, :, :] = (
+            perception_positions[step * iterations + iterations, :, :, :]
+            - perception_positions[step * iterations, :, :, :]
+        )
 
-        if x_data_i.shape[-1] == 3:
-            plt.imshow(x_data_i)
-        else:
-            plt.imshow(x_data_i, cmap="gray")
+    return movements
 
-        if i == 0:
-            xticks, yticks = get_plotting_ticks(x_data_i)
-            plt.xticks(xticks[0], xticks[1])
-            plt.yticks(yticks[0], yticks[1])
-        else:
-            plt.xticks([])
-            plt.yticks([])
+
+def get_delta_beliefs(network_classifications, iterations=1):
+    """
+    Calculate the change in the network's beliefs between every iteration in an episode.
+
+    Args:
+        network_classifications (list of lists of np.ndarrays): The network's classifications after each iteration in an episode.
+        iterations (int): How many iterations to skip between each calculation of delta beliefs.
+
+    Returns:
+        np.ndarray: The change in the network's beliefs between every iteration in the episode.
+    """
+    # Initialize array to store delta beliefs per timestep
+    delta_beliefs = np.zeros(((len(network_classifications) - 1) // iterations, *network_classifications.shape[1:]))
+
+    # For every timestep (sampled at every other iteration, specified by "iterations")
+    for step in range(0, (len(network_classifications) - 1) // iterations):
+        # Delta belief is belief after - belief before
+        delta_beliefs[step, :, :, :] = (
+            network_classifications[step * iterations + iterations, :, :, :]
+            - network_classifications[step * iterations, :, :, :]
+        )
+
+    return delta_beliefs
+
+
+def plot_heatmap(perception_positions, x_data_i, belief, actual_class):
+    """
+    Plot the input image, a heatmap of the perception fields' positions, and a superposition of the two.
+
+    Args:
+        perception_positions (list of lists of tuples): The positions of the perception fields after each iteration in an episode.
+        x_data_i (np.ndarray): The image to get the pixel frequencies from.
+        belief (str): The label of the class the network believed it was.
+        actual_class (str): The label of the class the network was actually classifying.
+    """
+    pixel_occupacy = get_episode_pixel_occupacy(perception_positions, x_data_i, iterations=1, count=False, area=True)
+
+    fig = plt.figure(frameon=False)
+    fig.suptitle("Believed class is " + belief + ", correct class is " + actual_class)
+
+    # Plotting the input image
+    plt.subplot(131)
+    plt.imshow(x_data_i, cmap="gray")  # "gray" is just ignored for color images
+    plt.title("Input image")
+    plt.xticks([])
+    plt.yticks([])
+
+    # Plotting the heatmap
+    heatmap = np.mean(pixel_occupacy, axis=(0))
+
+    plt.subplot(132)
+    # cmap_heatmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ["#00330000", "#FF00FF99", "#FF99FFFF"])
+    cmap = "viridis"
+    plt.imshow(heatmap, cmap=cmap)
+    plt.title("Field position heatmap")
+    plt.xticks([])
+    plt.yticks([])
+
+    # Plotting the superposition
+    plt.subplot(133)
+    plt.imshow(x_data_i * 0.7, vmin=0, vmax=1, cmap="gray")  # "gray" is just ignored for color images
+    plt.imshow((heatmap) / np.max(heatmap), alpha=(heatmap) / np.max(heatmap), cmap=cmap)
+    plt.title("image + heatmap")
+    plt.xticks([])
+    plt.yticks([])
+
+
+def plot_fields(perception_positions, x_data_i, belief, actual_class):
+    """
+    Plot the progression of perception fields over multiple iterations for a given input image.
+
+    Args:
+        perception_positions (list of lists of tuples): The positions of the perception fields after each iteration in an episode.
+        x_data_i (np.ndarray): The input image data to plot.
+        belief (str): The label of the class the network believed it was.
+        actual_class (str): The label of the class the network was actually classifying.
+
+    This function plots the input image along with rectangles indicating the perception fields' positions
+    for each iteration step. The pink rectangles represent the perception fields, and the function iterates
+    over each step, displaying the progression of these fields. The subplot titles indicate the iteration step.
+    """
+    iterations = 10
+
+    pixel_occupacy = get_episode_pixel_occupacy(
+        perception_positions, x_data_i, iterations=iterations, count=False, area=False
+    )
+
+    fig = plt.figure(figsize=(10, 3))
+    fig.suptitle("Believed class is " + belief + ", correct class is " + actual_class)
+
+    # Plotting per interval of iterations
+    for i in range(len(pixel_occupacy)):
+        plt.subplot(1, len(pixel_occupacy), i + 1)
+
+        # Plotting the input image, "gray" is just ignored for color images
+        plt.imshow(x_data_i, cmap="gray")
 
         # Plotting the pink fields as rectangles
         ax = plt.gca()
-        for x in range(frequencies.shape[0]):
-            for y in range(frequencies.shape[1]):
-                if frequencies[x, y] == 1:
+        for x in range(pixel_occupacy[i].shape[0]):
+            for y in range(pixel_occupacy[i].shape[1]):
+                if pixel_occupacy[i][x, y] >= 1:
                     # Origin of plt.Rectangle is upper left corner
                     # However, I call first axis the X-axis (it goes down, and is therefore plt's y-axis)
                     # Basically, my way of doing thing is switched from plt.imshow and plt.Rectangle
                     # Therefore, I switch x and y for Rectangle
                     rect = plt.Rectangle((y - 0.5, x - 0.5), 3, 3, fill=False, color="mediumvioletred", linewidth=1)
                     ax.add_patch(rect)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
         plt.title("Step: " + str(i * iterations))
 
-    # Now, under, we plot the evolution of system beliefs over time
 
-    sns.set_theme()
-    colors = [
-        "#2C2463",
-        "#DC267F",
-        "#EF792A",
-        "#D0AE3C",
-    ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
-    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
-    plt.subplot(int(str(rows) + "12"))
-    counter = 0
-    for line, label_i in zip(np.array(individual_beliefs).T, labels):
-        color = cmap((counter // 2) / max((len(labels) // 2 - 1), 1) / (len(labels) // 2))
-        style = "dashed" if counter % 2 == 0 else "solid"
-        if len(labels) == 3:
-            color = cmap((counter) / max((len(labels)), 1))
-            style = "solid"
-        plt.plot(
-            line / (config.scale.test_n_neo * config.scale.test_m_neo),
-            label=label_i,
-            color=color,
-            linestyle=style,
-        )
-        counter += 1
+def plot_path_map(perception_positions, x_data_i, network_classifications, label_belief, label_actual_class, labels):
+    """
+    Plot a heatmap of the perception fields' movement over the input image over multiple iterations.
 
-    plt.title("Correct class is " + labels[np.argmax(y_data_i)])
+    Args:
+        perception_positions (list of lists of tuples): The positions of the perception fields after each iteration in an episode.
+        x_data_i (np.ndarray): The input image data to plot.
+        network_classifications (list of np.ndarrays): The network's classifications after each iteration in an episode.
+        label_belief (str): The label of the class the network believed it was.
+        label_actual_class (str): The label of the class the network was actually classifying.
+        labels (list of str): A list of the labels of all classes.
+
+    The function plots the input image along with arrows indicating the movement of the perception fields
+    for each iteration step. The color of the arrows is determined by the class the network believed it was
+    at that iteration step. The subplot titles indicate the iteration step.
+    """
+    # The number of iterations to skip between each calculation of movement (and delta beliefs)
+    movement_iterations = 2
+
+    # Get the movement and delta beliefs
+    movements = get_movement(perception_positions, x_data_i, movement_iterations)
+    positions = perception_positions[:-1:2]
+    delta_beliefs = get_delta_beliefs(network_classifications, iterations=movement_iterations)
+
+    # Clarify parameters
+    partitions = 5  # number of partitions. So for movement_iterations = 2, partitions = 5 means 10 iterations (5 images for 50 timesteps)
+    B = movements.shape[0] // partitions  # B = 25/5 = 5
+    N_neo = movements.shape[1]  # Substrate size
+    M_neo = movements.shape[2]
+    N_img = x_data_i.shape[0]  # Image size
+    M_img = x_data_i.shape[1]
+    C = network_classifications.shape[-1]  # Number of classes
+
+    # Initialize arrays
+    count = np.zeros((B, N_img, M_img))
+    avg_movement = np.zeros((B, N_img, M_img, 2))
+    opinions = np.zeros((B, N_img, M_img, C))
+
+    # Calculate counts, average movement, and opinions
+    for i in range(B):
+        for x in range(N_neo):
+            for y in range(M_neo):
+                for j in range(partitions):
+                    x_p, y_p = positions[i * partitions + j, x, y]
+                    x_p, y_p = int(x_p), int(y_p)
+                    count[i, x_p, y_p] += 1
+                    avg_movement[i, x_p, y_p, 0] += movements[i * partitions + j, x, y, 0]
+                    avg_movement[i, x_p, y_p, 1] += movements[i * partitions + j, x, y, 1]
+
+                    belief = np.argmax(delta_beliefs[(i * partitions + j), x, y, :])
+                    opinions[i, x_p, y_p, belief] += 1
+
+    # Calculate average movement and opinions
+    avg_belief = np.zeros((B, N_img, M_img))
+    for i in range(B):
+        for x in range(N_img):
+            for y in range(M_img):
+                if count[i, x, y] > 0:
+                    avg_movement[i, x, y] /= np.linalg.norm(avg_movement[i, x, y])
+                    avg_belief[i, x, y] = np.argmax(opinions[i, x, y])
+
+    # Time to start plotting
+    plt.figure()
+
+    # Not colorblind friendly, but necessary for me to distinguish between at most 10 arrows
+    cmap = matplotlib.cm.get_cmap("rainbow", C)
+
+    # Plot each iteration
+    for i in range(B):
+        plt.subplot(int(str(1) + str(B) + str(1 + i)))
+        plt.imshow(x_data_i, cmap="gray")  # "gray" is just ignored for color images
+        plt.title(str(i * partitions * movement_iterations) + " - " + str((i + 1) * partitions * movement_iterations))
+        plt.xticks([])
+        plt.yticks([])
+
+        avg_belief_i = np.zeros(C)  # Just for debugging
+        # Plot arrows
+        for x in range(N_img):
+            for y in range(M_img):
+                if count[i, x, y] > 0:
+                    plt.arrow(
+                        y + 1,
+                        x + 1,
+                        avg_movement[i, x, y, 1],
+                        avg_movement[i, x, y, 0],
+                        width=0.2,
+                        color=cmap(avg_belief[i, x, y] / C),
+                        alpha=min(count[i, x, y] / (4 if N_neo > 7 else 3), 1),
+                    )
+                    avg_belief_i[int(avg_belief[i, x, y])] += 1
+
+        # Plot labels for debugging
+        print("Label is " + label_belief + ", and avg opinion is" + str(avg_belief_i))
+
+    # Plot colorbar
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    cbar = plt.colorbar(sm, ticks=np.linspace(0, 1, C))
+    cbar.ax.set_yticklabels(labels)
+
+
+def plot_beliefs(network_classifications, label_belief, label_actual_class):
+    """
+    Plot the average beliefs of the system over time.
+
+    Args:
+        network_classifications (numpy array): Array of shape (ep_length, N_neo, M_neo, C) with the network's classifications.
+        label_belief (str): Label of the belief of the network.
+        label_actual_class (str): Label of the actual class of the input.
+    """
+    ep_length, N_neo, M_neo, C = network_classifications.shape
+    # Initialize array of opinions over time
+    counter_per_class = np.zeros((ep_length, C))
+
+    # For every timestep
+    for i in range(ep_length):
+        # For every cell in the substrate
+        for j in range(N_neo):
+            for k in range(M_neo):
+                # Get the class with the highest belief, and add it to the counter
+                belief = np.argmax(network_classifications[i, j, k])
+                counter_per_class[i, belief] += 1
+
+    # Normalize
+    counter_per_class /= N_neo * M_neo
+
+    plt.figure()
+    for c in range(C):
+        plt.plot(range(ep_length), counter_per_class[:, c], label=labels[c])
+
+    plt.title("Correct class is " + label_actual_class)
     plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
     plt.ylabel("System beliefs (%)")
     plt.xlabel("Time steps")
     plt.legend()
 
 
-def plot_individual_classifications():
-    # Get network and data
-    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
-    kwargs["test"] = True
-    test_data, target_data = data_func(**kwargs)
+def plot_delta_beliefs(network_classifications, label_belief, label_actual_class):
+    """
+    Plot the average change in beliefs of the system over time.
 
-    # For each datapoint
-    for x_data_i, y_data_i in zip(test_data, target_data):
-        # Get frequencies and individual beliefs
-        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
-        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
-        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10)
-        plot_frequencies_and_beliefs(
-            frequencies_list,
-            individual_beliefs,
-            x_data_i,
-            y_data_i,
-            network.iterations,
-            labels,
-        )
+    Args:
+        network_classifications (numpy array): Array of shape (ep_length, N_neo, M_neo, C) with the network's classifications.
+        label_belief (str): Label of the belief of the network.
+        label_actual_class (str): Label of the actual class of the input.
+    """
+    # How many iterations to interpolate between
+    delta_iterations = 2
 
+    delta_beliefs = get_delta_beliefs(network_classifications, iterations=delta_iterations)
+
+    ep_length, N_neo, M_neo, C = delta_beliefs.shape
+    # Initialize array of opinions over time
+    counter_per_class = np.zeros((ep_length, C))
+    print(counter_per_class.shape)
+
+    # For every timestep
+    for i in range(ep_length):
+        # For every cell in the substrate
+        for j in range(N_neo):
+            for k in range(M_neo):
+                # Get the class with the highest belief, and add it to the counter
+                belief = np.argmax(delta_beliefs[i, j, k])
+                counter_per_class[i, belief] += 1
+
+    # Normalize
+    counter_per_class /= N_neo * M_neo
+
+    for c in range(C):
+        plt.plot(range(ep_length), counter_per_class[:, c], label=labels[c])
+
+    plt.title("Correct class is " + label_actual_class)
+    plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
+    plt.ylabel("System beliefs (%)")
+    plt.xlabel("Time steps")
+    plt.legend()
     plt.show()
 
 
-def plot_individual_classifications_beliefs():
-    # Get network and data
-    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
-    kwargs["test"] = True
-    test_data, target_data = data_func(**kwargs)
+def get_labelled_belief(class_channels, labels):
+    """
+    Calculate the label of the belief from class channels.
 
-    # For each datapoint
-    for x_data_i, y_data_i in zip(test_data, target_data):
-        # Get frequencies and individual beliefs
-        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
-        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
-        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(network, x_data_i, frequency_iterations=10)
+    Args:
+        class_channels (np.ndarray): Multi-dimensional array representing the class channels.
+        labels (list of str): List of labels corresponding to the classes.
 
-        sns.set_theme()
-        colors = [
-            "#2C2463",
-            "#DC267F",
-            "#EF792A",
-            "#D0AE3C",
-        ]  # Modified Plasma palette to be more colorfriendly (but idk if I succeeded)
-        cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)
-        plt.figure()
-        counter = 0
-        for line, label_i in zip(np.array(individual_beliefs).T, labels):
-            color = cmap((counter // 2) / max((len(labels) // 2 - 1), 1) / (len(labels) // 2))
-            style = "dashed" if counter % 2 == 0 else "solid"
-            if len(labels) == 3:
-                color = cmap((counter) / max((len(labels)), 1))
-                style = "solid"
-            plt.plot(
-                line / (config.scale.test_n_neo * config.scale.test_m_neo),
-                label=label_i,
-                color=color,
-                linestyle=style,
-            )
-            counter += 1
+    Returns:
+        str: The label of the class with the highest belief.
+    """
+    belief = np.mean(class_channels, axis=(-3, -2))
+    label_belief = get_label_from_belief_vector(belief, labels)
 
-        plt.title("Correct class is " + labels[np.argmax(y_data_i)])
-        plt.yticks(np.arange(0, 1.2, 0.2), np.arange(0, 120, 20))
-        plt.ylabel("System beliefs (%)")
-        plt.xlabel("Time steps")
-        plt.legend()
-
-    plt.show()
+    return label_belief
 
 
-def plot_heatmap():
-    # Get network and data
-    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
-    kwargs["test"] = True
-    test_data, target_data = data_func(**kwargs)
+def get_label_from_belief_vector(belief_vector, labels):
+    """
+    Get the label of the belief from a belief vector.
 
-    # For each datapoint
-    for x_data_i, y_data_i in zip(test_data, target_data):
-        # Get frequencies and individual beliefs
-        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
-        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
-        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(
-            network, x_data_i, frequency_iterations=1, count=False, area=True
-        )
+    Args:
+        belief_vector (np.ndarray): Vector representing the class channels.
+        labels (list of str): List of labels corresponding to the classes.
 
-        fig = plt.figure()
-        fig.suptitle("Believed class is " + labels[np.argmax(individual_beliefs[-1])])
+    Returns:
+        str: The label of the class with the highest belief.
+    """
+    numerical_belief = np.argmax(belief_vector)
+    label_belief = labels[numerical_belief]
 
-        plt.subplot(131)
-        plt.imshow(x_data_i, cmap="gray")
-        plt.title("Input image")
-
-        heatmap = np.mean(frequencies_list, axis=(0, -1))
-
-        plt.subplot(132)
-        plt.imshow(heatmap)
-        plt.title("Field position heatmap")
-
-        if x_data_i.shape[2] <= 1:
-            plt.subplot(133)
-            image_plus_heatmap = np.zeros((x_data_i.shape[0], x_data_i.shape[1], 3))
-            image_plus_heatmap[:, :, 0] = (heatmap) / np.max(heatmap)
-            image_plus_heatmap[:, :, 1] = x_data_i[:, :, 0] * 0.7
-            image_plus_heatmap[:, :, 2] = (heatmap) / np.max(heatmap)
-            plt.imshow(image_plus_heatmap)
-            plt.title("image + heatmap")
-
-        else:
-            plt.subplot(133)
-            image_plus_heatmap = np.zeros((x_data_i.shape[0], x_data_i.shape[1], 3))
-            image_plus_heatmap[:, :, 0] = (heatmap) / np.max(heatmap)
-            image_plus_heatmap[:, :, 1] = color.rgb2gray(x_data_i)
-            image_plus_heatmap[:, :, 2] = (heatmap) / np.max(heatmap)
-            plt.imshow(image_plus_heatmap)
-            plt.title("image + heatmap")
-
-        plt.show()
-
-
-def plot_path_map():
-    # Get network and data
-    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
-    kwargs["test"] = True
-    test_data, target_data = data_func(**kwargs)
-
-    # For each datapoint
-    for x_data_i, y_data_i in zip(test_data, target_data):
-        # Get frequencies and individual beliefs
-        # Frequencies is if the pixel is visited IN THAT timestep or not. So no averaging (this gives a better image than averaging)
-        # Individual beliefs is what the system thinks the class is at EVERY timestep. Likewise, no averaging.
-        frequencies_list, individual_beliefs = get_frequencies_and_beliefs(
-            network, x_data_i, frequency_iterations=1, count=False, area=True
-        )
-
-        movement_iterations = 2
-        partitions = 5
-
-        movements, positions = get_movement(network, x_data_i, movement_iterations=movement_iterations)
-
-        plt.figure()
-
-        for i in range(len(movements) // partitions):
-            all_positions = {}
-
-            for movement, position in zip(
-                movements[i * partitions : (i + 1) * partitions], positions[i * partitions : (i + 1) * partitions]
-            ):
-
-                for x in range(movement.shape[0]):
-                    for y in range(movement.shape[1]):
-                        if (position[x, y, 0], position[x, y, 1]) not in all_positions:
-                            all_positions[(position[x, y, 0], position[x, y, 1])] = [
-                                [movement[x, y, 0], movement[x, y, 1]]
-                            ]
-                        else:
-                            all_positions[(position[x, y, 0], position[x, y, 1])].append(
-                                [movement[x, y, 0], movement[x, y, 1]]
-                            )
-
-            plt.subplot(int(str(1) + str(len(movements) // partitions) + str(1 + i)))
-            plt.imshow(x_data_i, cmap="gray")
-            plt.title(
-                str(i * partitions * movement_iterations) + " - " + str((i + 1) * partitions * movement_iterations)
-            )
-
-            for pos, movements_at_point in all_positions.items():
-                avg_movement = np.mean(movements_at_point, axis=0)
-                avg_movement /= np.linalg.norm(avg_movement)
-                if avg_movement[0] == 0 and avg_movement[1] == 0:
-                    plt.scatter(pos[1] + 1, pos[0] + 1, color="hotpink")
-                else:
-                    plt.arrow(
-                        pos[1] + 1,
-                        pos[0] + 1,
-                        avg_movement[1],
-                        avg_movement[0],
-                        width=0.2,
-                        alpha=min(len(movements_at_point) / 4, 1),
-                        color="hotpink",
-                    )
-                """for movement in movements_at_point:
-                    plt.arrow(
-                        pos[1] + 1,
-                        pos[0] + 1,
-                        movement[1],
-                        movement[0],
-                        width=0.4,
-                        alpha=0.2,
-                        color="hotpink",
-                    )"""
-
-    plt.show()
+    return label_belief
 
 
 if __name__ == "__main__":
-    np.random.seed(42)
-    random.seed(42)
-    plot_individual_classifications_beliefs()
+    # Seed for MNIST and CIFAR used in article
+    """np.random.seed(42)
+    random.seed(42)"""
+
+    # Seed for fashion MNIST used in article
+    np.random.seed(24)
+    random.seed(24)
+
+    # Get network and data
+    network, labels, data_func, kwargs, predicting_method = get_network(sub_path, NUM_DATA)
+    kwargs["test"] = True
+    test_data, target_data = data_func(**kwargs)
+
+    # For each datapoint
+    for x_data_i, y_data_i in zip(test_data, target_data):
+        # Get data
+        perception_positions, network_classifications = get_data(network, x_data_i)
+
+        # Get label
+        label_belief = get_labelled_belief(network_classifications[-1], labels)
+        label_actual_class = get_label_from_belief_vector(y_data_i, labels)
+
+        plot_heatmap(perception_positions, x_data_i, label_belief, label_actual_class)
+
+        # plot_fields(perception_positions, x_data_i, label_belief, label_actual_class)
+
+        # plot_path_map(perception_positions, x_data_i, network_classifications, label_belief, label_actual_class, labels)
+
+        # plot_beliefs(network_classifications, label_belief, label_actual_class)
+
+        # plot_delta_beliefs(network_classifications, label_belief, label_actual_class)
+
+    plt.show()
