@@ -1,5 +1,6 @@
 # Numpy uses a lot of threads when running in parallel.
-# Set OPENBLAS_NUM_THREADS=1 to avoid this
+# This didn't play well with multiprocessing and slurm.
+# Set OPENBLAS_NUM_THREADS=1 to reduce numpy threads to 1 for increased speed.
 import os
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -7,7 +8,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 from functools import partial
 
 import numpy as np
-from src.moving_nca_no_tf import MovingNCA
+from src.active_nca import ActiveNCA
 
 ### NB!
 # Most imports are moved if __name__ == "__main__"
@@ -134,7 +135,7 @@ def evaluate_nca_batch(
         steps = 1
 
     # Getting network
-    network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
+    network = ActiveNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     # Reset network and get classifications
     B = training_data.shape[0]
@@ -196,7 +197,7 @@ def evaluate_nca(
     else:
         steps = 1
 
-    network = MovingNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
+    network = ActiveNCA.get_instance_with(flat_weights, size_neo=(N_neo, M_neo), **moving_nca_kwargs)
 
     if return_confusion:
         conf_matrix = np.zeros((len(target_data[0]), len(target_data[0])), dtype=np.float32)
@@ -208,11 +209,17 @@ def evaluate_nca(
         if not pool_training or sample % 2 == 0:
             network.reset()
 
+        if visualize and (visualized < args.vis_num):
+            print("Correct:", moving_nca_kwargs["labels"][np.argmax(expected)])
+
         for step in range(steps):
             visualize_step = visualize and (visualized < args.vis_num)
 
             class_predictions, guesses = network.classify(
-                img_raw, visualize=visualize_step, step=step if stable else None
+                img_raw,
+                visualize=visualize_step,
+                step=step if stable else None,
+                correct_label_index=np.argmax(expected) if visualize_step else None,
             )
 
             if visualize_step and step == steps - 1:
@@ -263,7 +270,7 @@ def run_optimize(
 
     # Print amount of weights
     _, _, weight_amount = get_weights_info(
-        MovingNCA(size_neo=(config.scale.train_n_neo, config.scale.train_m_neo), **moving_nca_kwargs).weights
+        ActiveNCA(size_neo=(config.scale.train_n_neo, config.scale.train_m_neo), **moving_nca_kwargs).weights
     )
     print("\nWeights:", int(weight_amount), "\n")
 
@@ -546,9 +553,13 @@ if __name__ == "__main__":
         winner_flat = Logger.load_checkpoint(args.test_path)
 
     # Get test data for new evaluation
-    # kwargs["SAMPLES_PER_CLASS"] = 500
+    kwargs["SAMPLES_PER_CLASS"] = 500
 
     kwargs["test"] = True
+    np.random.seed(42)  # 24 for  fashion # 42 for MNIST and CIFAR
+    import random
+
+    random.seed(42)
     training_data, target_data = data_func(**kwargs)
 
     print("\nEvaluating winner:")
@@ -576,8 +587,26 @@ if __name__ == "__main__":
         import seaborn as sns
 
         sns.heatmap(conf / (kwargs["SAMPLES_PER_CLASS"]), annot=True, cmap="plasma")
+        plt.xticks(np.arange(len(moving_nca_kwargs["mnist_digits"])), moving_nca_kwargs["labels"])
+        plt.yticks(np.arange(len(moving_nca_kwargs["mnist_digits"])), moving_nca_kwargs["labels"])
         plt.ylabel("Real")
         plt.xlabel("Predicted")
+
+        """new_ordering = [3, 0, 2, 4, 6, 8, 1, 5, 7, 9]
+
+        new_conf = np.zeros((10, 10))
+        for i in range(10):
+            class_i = new_ordering[i]
+            for j in range(10):
+                class_j = new_ordering[j]
+                new_conf[i][j] = conf[class_i][class_j]
+
+        plt.figure()
+        sns.heatmap(np.round(new_conf / (kwargs["SAMPLES_PER_CLASS"]), 2), annot=True, cmap="plasma")
+        plt.xticks(np.arange(10), np.array(get_labels(data_func, kwargs["CLASSES"]))[new_ordering], rotation=45)
+        plt.yticks(np.arange(10), np.array(get_labels(data_func, kwargs["CLASSES"]))[new_ordering], rotation=-45)
+        plt.ylabel("Real")
+        plt.xlabel("Predicted")"""
         plt.show()
     else:
         print(conf / (kwargs["SAMPLES_PER_CLASS"]))
