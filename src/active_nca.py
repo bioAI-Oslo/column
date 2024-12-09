@@ -46,7 +46,26 @@ class ActiveNCA:
         labels=None,
         activation=None,
     ):
+        """
+        Initialize an ActiveNCA instance.
 
+        Args:
+            num_hidden (int): Number of hidden channels.
+            hidden_neurons (int or list, optional): if int: One layer with hidden_neurons nodes.
+                                          if list: Number of nodes in each layer.
+                                          Defaults to 10.
+            img_channels (int, optional): Number of image channels (1 or 3, typically). Defaults to 1.
+            iterations (int, optional): Number of iterations for the episodes. Defaults to 50.
+            position (str, optional): Position type for the NCA. Defaults to "None".
+            size_neo (tuple or None, optional): Size of the NEO (Neural Evolution Optimization). If None, it is calculated
+                                    based on size_image. Defaults to (size_image[0]-2, size_image[1]-2) if None.
+            size_image (tuple or None, optional): Size of the input image. Defaults to (28, 28) if None.
+            moving (bool, optional): Whether the NCA is moving or not. Defaults to True.
+            mnist_digits (tuple, optional): Tuple of MNIST digits to be used. Defaults to (0, 3, 4).
+            labels (list or None, optional): Optional labels for the data. Defaults to None.
+            activation (str or None, optional): Activation function to be used. If None, defaults to a linear activation. Defaults to linear if None.
+
+        """
         if size_image is None:
             size_image = (28, 28)
         self.size_image = size_image
@@ -145,11 +164,13 @@ class ActiveNCA:
         If you wish to reset the state and perception, remember to call reset_batched().
 
         Args:
-            images_raw: The raw input images
-            visualize: Not supported, kept for ease of coding
+            images_raw (np.ndarray): The raw input images
+            visualize (bool, optional): Not supported, kept for ease of coding
+            step (int, optional): The current step number. If None, will classify once, for the full episode.
 
         Returns:
-            A tuple containing the updated state_batched and the guesses
+            np.ndarray: The states of the model after classification (only class channels).
+            np.ndarray: The guesses made by the model.
         """
         B = len(images_raw)
         N_neo, M_neo = self.size_neo
@@ -192,19 +213,21 @@ class ActiveNCA:
                     self.perceptions_batched, outputs[:, :, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
 
-        # I should really phase out having guesses here, I don't use it for anything... TODO
+        # I should really phase out having guesses here, I don't use it for anything...
         return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
 
     def classify(self, img_raw, visualize=False, step=None, correct_label_index=None):  # , silencing_indexes=None):
         """
         Classify the input image using the trained model.
 
-        Parameters:
+        Args:
             img_raw (np.ndarray): The raw input image.
             visualize (bool, optional): Whether to visualize the classification process. Defaults to False.
+            step (int, optional): The current step number. If None, will classify once, for the full episode.
+            correct_label_index (int, optional): The index of the correct label.
 
         Returns:
-            np.ndarray: The state of the model after classification.
+            np.ndarray: The state of the model after classification (only class channels).
             np.ndarray: The guesses made by the model.
         """
 
@@ -220,28 +243,29 @@ class ActiveNCA:
         guesses = None
         iterations = self.iterations if step is None else 1
         for _ in range(iterations):
+            # The input vector is constructed
             input = np.empty((N_neo * M_neo, 3 * 3 * self.input_dim + self.position_addon))
             collect_input(input, img_raw, self.state, self.perceptions, self.position, N_neo, M_neo, N_active, M_active)
 
-            """if silencing_indexes is not None:
-                for i, j in zip(silencing_indexes[0], silencing_indexes[1]):
-                    input[i * N_neo + j] = 0"""
-
-            # guesses = tf.stop_gradient(self.dmodel(input)) # This doesn't make a difference
+            # The output "guesses" are made by the model for each cell
             guesses = self.dmodel(input)
             # guesses = guesses.numpy()
 
+            # Reshape back into substrate shape
             outputs = np.reshape(guesses[:, :], (N_neo, M_neo, self.output_dim))
 
+            # Update the state/substrate
             self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] = (
                 self.state[1 : 1 + N_neo, 1 : 1 + M_neo, :] + outputs[:, :, : self.input_dim - self.img_channels]
             )
 
+            # Update the perception if moving
             if self.moving:
                 alter_perception_slicing(
                     self.perceptions, outputs[:, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
 
+            # Collect visualization info if needed
             if visualize:
                 self.images.append(copy.deepcopy(img_raw))
                 self.states.append(copy.deepcopy(self.state))
@@ -249,6 +273,7 @@ class ActiveNCA:
                     self.actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
                 self.perceptions_through_time.append(copy.deepcopy(self.perceptions))
 
+        # Last step? If visualize, then visualize
         if visualize and (step is None or step == self.iterations - 1):
             self.visualize(
                 self.images,
@@ -260,6 +285,7 @@ class ActiveNCA:
                 self.labels,
                 correct_label_index,
             )
+            # Clear visualization info
             self.images = None
             self.states = None
             self.actions = None
@@ -278,6 +304,19 @@ class ActiveNCA:
         MNIST_DIGITS,
         correct_label_index,
     ):
+        """
+        Visualize the ActiveNCA's behavior. This function creates a new process and calls the animate function.
+
+        Args:
+            images (List of 2D numpy arrays): The images seen by the ActiveNCA
+            states (List of 3D numpy arrays): The states of the ActiveNCA
+            actions (List of 3D numpy arrays): The actions taken by the ActiveNCA
+            perceptions_through_time (List of 3D numpy arrays): The perceptions of the ActiveNCA over time
+            HIDDEN_CHANNELS (int): The number of hidden channels in the ActiveNCA
+            CLASS_CHANNELS (int): The number of class channels in the ActiveNCA
+            MNIST_DIGITS (tuple of int): The digits that the ActiveNCA was trained on
+            correct_label_index (int): The index of the correct label in the MNIST_DIGITS tuple
+        """
         # It's slower, however the animate function spawns many objects and leads to memory leaks. By using the
         # function in a new process, all objects should be cleaned up at close and the animate function
         # can be used as many times as wanted
@@ -318,6 +357,28 @@ class ActiveNCA:
         labels=None,
         activation=None,
     ):
+        """
+        Get an instance of the ActiveNCA class with the given parameters and set its weights to the given flat weights.
+
+        Args:
+            num_hidden (int): Number of hidden channels.
+            hidden_neurons (int or list, optional): if int: One layer with hidden_neurons nodes.
+                                          if list: Number of nodes in each layer.
+                                          Defaults to 10.
+            img_channels (int, optional): Number of image channels (1 or 3, typically). Defaults to 1.
+            iterations (int, optional): Number of iterations for the episodes. Defaults to 50.
+            position (str, optional): Position type for the NCA. Defaults to "None".
+            size_neo (tuple or None, optional): Size of the NEO (Neural Evolution Optimization). If None, it is calculated
+                                    based on size_image. Defaults to (size_image[0]-2, size_image[1]-2) if None.
+            size_image (tuple or None, optional): Size of the input image. Defaults to (28, 28) if None.
+            moving (bool, optional): Whether the NCA is moving or not. Defaults to True.
+            mnist_digits (tuple, optional): Tuple of MNIST digits to be used. Defaults to (0, 3, 4).
+            labels (list or None, optional): Optional labels for the data. Defaults to None.
+            activation (str or None, optional): Activation function to be used. If None, defaults to a linear activation. Defaults to linear if None.
+
+        Returns:
+            ActiveNCA: The ActiveNCA instance with the given parameters and weights.
+        """
         network = ActiveNCA(
             num_hidden=num_hidden,
             hidden_neurons=hidden_neurons,
@@ -336,11 +397,23 @@ class ActiveNCA:
         return network
 
     def set_weights(self, flat_weights):
+        """
+        Set the weights of the model using the provided flattened weights.
+
+        Args:
+            flat_weights (np.ndarray): The flattened weights to be reshaped and set for the model.
+        """
         self.weights = get_model_weights(flat_weights, self.weight_amount_list, self.weight_shape_list)
 
         self.create_model()
 
     def create_model(self):
+        """
+        Create a feed forward neural network model from the weights and activation functions
+
+        Creates a feed forward neural network model from the weights and activation functions stored in the object.
+        The model is then stored in the object as self.dmodel.
+        """
 
         # Func is a feed forward network that takes input x and returns output y
         def func(x):
@@ -360,7 +433,7 @@ def custom_round_slicing(x: list):
     Negative values are rounded down to -1, positive values are rounded
     up to 1, and zero values are rounded to 0.
 
-    Parameters:
+    Args:
         x (list): The input list of values.
 
     Returns:
@@ -381,8 +454,16 @@ def custom_round_slicing(x: list):
 
 @njit
 def clipping(array, N, M):
-    # This function clips the values in the array to the range [0, N]
-    # It alters the array in place
+    """
+    Clip the values in the array to the range [0, N].
+
+    Alters the array in place.
+
+    Args:
+        array (np.ndarray): The array to be clipped.
+        N (int): The upper bound to clip to.
+        M (int): The upper bound to clip to (should be the same as N).
+    """
     for x in range(len(array)):
         for y in range(len(array[0])):
             array[x, y, 0] = min(max(array[x, y, 0], 0), N)
@@ -390,6 +471,18 @@ def clipping(array, N, M):
 
 
 def add_action_slicing(perception: list, action: list, N: int, M: int) -> np.ndarray:
+    """
+    Modify the perception array by adding a rounded version of the action array
+    and clip the resulting values to the range [0, N-1].
+
+    Args:
+        perception (np.ndarray): The perception array to be modified.
+        action (np.ndarray): The action array to be added to the perception.
+        N (int): The valid image coordinate number (so for image size 28x28, N = 28-2 = 26).
+        M (int): Must be equal to N, otherwise an assertion error is raised.
+
+    Returns None: The perception array is modified in place.
+    """
     perception += custom_round_slicing(action)
     assert N == M, "The code currently does not support N != M"
     clipping(perception, N - 1, M - 1)  # Changes array in place
@@ -397,13 +490,35 @@ def add_action_slicing(perception: list, action: list, N: int, M: int) -> np.nda
 
 def alter_perception_slicing(perceptions, actions, N_neo, M_neo, N_active, M_active):
     # TODO: Remove this fucntion, you only need the one below
+    """
+    Modify the perception array by adding a rounded version of the action array
+    and clip the resulting values to the range [0, N_active-1].
+
+    Args:
+        perceptions (np.ndarray): The perception array to be modified.
+        actions (np.ndarray): The action array to be added to the perception.
+        N_neo (int): Not needed
+        M_neo (int): Not needed
+        N_active (int): The valid image coordinate number (so for image size 28x28, N = 28-2 = 26).
+        M_active (int): Must be equal to N_active, otherwise an assertion error is raised.
+
+    Returns None: The perception array is modified in place.
+    """
     add_action_slicing(perceptions, actions, N_active, M_active)
 
 
 @njit
 def clipping_batched(array, N, M):
-    # This function clips the values in the array to the range [0, N]
-    # It alters the array in place
+    """
+    Clip the values in the array to the range [0, N].
+
+    Alters the array in place.
+
+    Args:
+        array (np.ndarray): The array to be clipped.
+        N (int): The upper bound to clip to.
+        M (int): The upper bound to clip to (should be the same as N).
+    """
     B, N_neo, M_neo, _ = array.shape
     for b in range(B):
         for x in range(N_neo):
@@ -413,22 +528,65 @@ def clipping_batched(array, N, M):
 
 
 def add_action_slicing_batched(perceptions_batched: list, actions_batched: list, N: int, M: int) -> np.ndarray:
+    """
+    Modify the perception array by adding a rounded version of the action array
+    and clip the resulting values to the range [0, N-1].
+
+    Args:
+        perceptions_batched (np.ndarray): The perception array to be modified.
+        actions_batched (np.ndarray): The action array to be added to the perception.
+        N (int): The valid image coordinate number (so for image size 28x28, N = 28-2 = 26).
+        M (int): Must be equal to N, otherwise an assertion error is raised.
+
+    Returns None: The perception array is modified in place.
+    """
     perceptions_batched += custom_round_slicing(actions_batched)
     assert N == M, "The code currently does not support N != M"
     clipping_batched(perceptions_batched, N - 1, M - 1)  # Changes array in place
 
 
 def alter_perception_slicing_batched(perceptions_batched, actions_batched, N_neo, M_neo, N_active, M_active):
+    """
+    Modify the perception array by adding a rounded version of the action array
+    and clip the resulting values to the range [0, N-1].
+
+    Args:
+        perceptions_batched (np.ndarray): The perception array to be modified.
+        actions_batched (np.ndarray): The action array to be added to the perception.
+        N_neo (int): Not needed
+        M_neo (int): Not needed
+        N_active (int): The valid image coordinate number (so for image size 28x28, N = 28-2 = 26).
+        M_active (int): Must be equal to N_active, otherwise an assertion error is raised.
+
+    Returns None: The perception array is modified in place.
+    """
+
     add_action_slicing_batched(perceptions_batched, actions_batched, N_active, M_active)
 
 
 @njit
 def collect_input(input, img, state, perceptions, position, N_neo, M_neo, N_active, M_active):
+    """
+    Populate the input array for the ActiveNCA.
+
+    Args:
+        input (np.ndarray): The array to be populated. Should be of shape (N_neo * M_neo, -1).
+        img (np.ndarray): The image to be input to the ActiveNCA. Should be of shape (N, M, -1).
+        state (np.ndarray): The state of the ActiveNCA. Should be of shape (N_neo, M_neo, -1).
+        perceptions (np.ndarray): The positions of the neo-pixels. Should be of shape (N_neo, M_neo, 2).
+        position (str): Which position to use for the input. Can be "current" or "None".
+        N_neo (int): The number of neo-pixels in the x-direction.
+        M_neo (int): The number of neo-pixels in the y-direction.
+        N_active (int): The valid image coordinate number (so for image size 28x28, N = 28-2 = 26).
+        M_active (int): Must be equal to N_active, otherwise an assertion error is raised.
+
+    Returns None: The input array is modified in place.
+    """
     for x in range(N_neo):
         for y in range(M_neo):
             x_p, y_p = perceptions[x, y]
-            perc = img[x_p : x_p + 3, y_p : y_p + 3, :]
-            comms = state[x : x + 3, y : y + 3, :]
+            perc = img[x_p : x_p + 3, y_p : y_p + 3, :]  # Get the perception, the receptive field neighborhood
+            comms = state[x : x + 3, y : y + 3, :]  # Get the communication, the substrate neighborhood
             dummy = np.concatenate((perc, comms), axis=2)
             dummy_flat = dummy.flatten()
             input[x * M_neo + y, : len(dummy_flat)] = dummy_flat
@@ -448,14 +606,33 @@ def collect_input(input, img, state, perceptions, position, N_neo, M_neo, N_acti
 def collect_input_batched(
     input, images, state_batched, perceptions_batched, position, N_neo, M_neo, N_active, M_active
 ):
+    """
+    Populate the input array for a batch of images in the ActiveNCA model. Batched version.
+
+    Args:
+        input (np.ndarray): The array to be populated. Should be of shape (B * N_neo * M_neo, -1).
+        images (np.ndarray): The batch of images to be input to the ActiveNCA. Should be of shape (B, N, M, -1).
+        state_batched (np.ndarray): The batched state of the ActiveNCA. Should be of shape (B, N_neo, M_neo, -1).
+        perceptions_batched (np.ndarray): The batched positions of the neo-pixels. Should be of shape (B, N_neo, M_neo, 2).
+        position (str): Which position to use for the input. Can be "current" or "None".
+        N_neo (int): The number of neo-pixels in the x-direction.
+        M_neo (int): The number of neo-pixels in the y-direction.
+        N_active (int): The valid image coordinate number (e.g., for image size 28x28, N = 28-2 = 26).
+        M_active (int): Must be equal to N_active, otherwise an assertion error is raised.
+
+    Returns:
+        None: The input array is populated in place.
+    """
     B, _, _, _ = images.shape
 
     for x in range(N_neo):
         for y in range(M_neo):
             for b in range(B):
                 x_p, y_p = perceptions_batched[b, x, y].T
-                perc = images[b, x_p : x_p + 3, y_p : y_p + 3, :]
-                comms = state_batched[b, x : x + 3, y : y + 3, :]
+                perc = images[
+                    b, x_p : x_p + 3, y_p : y_p + 3, :
+                ]  # Get the perception, the receptive field neighborhood
+                comms = state_batched[b, x : x + 3, y : y + 3, :]  # Get the communication, the substrate neighborhood
 
                 dummy = np.concatenate((perc, comms), axis=-1)
                 dummy_flat = dummy.flatten()
@@ -473,6 +650,7 @@ def collect_input_batched(
 
     # Below is the old version, almost as fast, but not quite.
     # If something is wrong with the new version, I trust this version to be correct
+    # Also keeping it for reference, as the above should be doing what is below
     """for i in range(B):
         input_inner = np.empty((N_neo * M_neo, input.shape[1]))
         collect_input(
@@ -488,35 +666,18 @@ def collect_input_batched(
 
 
 def get_dimensions(data_shape, neo_shape):
+    """
+    Calculate the number of active neo-pixels in the x and y direction.
+
+    Args:
+        data_shape (tuple): The shape of the image data. Should be of form (N, M, -1).
+        neo_shape (tuple or None): The shape of the neo-pixels. Should be of form (N_neo, M_neo).
+            If None, the number of active neo-pixels is set to N_neo = N - 2 and M_neo = M - 2.
+
+    Returns:
+        tuple: The number of active neo-pixels in the x and y direction.
+    """
     N, M = data_shape
     N_neo = N - 2 if neo_shape is None else neo_shape[0]
     M_neo = M - 2 if neo_shape is None else neo_shape[1]
     return N_neo, M_neo
-
-
-### The functions below are not really used.
-
-
-def expand(arr):
-    B, N, M, _ = arr.shape
-    expanded_arr = np.zeros((B, N * 3, M * 3, 2), dtype=np.int32)
-    x_p, y_p = arr[:, :, :, 0], arr[:, :, :, 1]
-
-    for i in range(3):
-        for j in range(3):
-            expanded_arr[:, i::3, j::3, 0] = x_p + i
-            expanded_arr[:, i::3, j::3, 1] = y_p + j
-
-    return expanded_arr  # Fucking "in16" is not supported...
-
-
-def gather_mine(arr, movement_expanded):
-    B, N_neo, M_neo, _ = movement_expanded.shape
-    new_arr = np.empty((B, N_neo, M_neo, arr.shape[-1]), dtype=arr.dtype)
-
-    for b in range(B):
-        for x in range(N_neo):
-            for y in range(M_neo):
-                new_arr[b, x, y, :] = arr[b, movement_expanded[b, x, y, 0], movement_expanded[b, x, y, 1], :]
-
-    return new_arr
