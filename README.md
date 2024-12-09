@@ -38,5 +38,47 @@ Code mainly produced by: Mia-Katrin Kvalsund
 
 Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellular Robot Substrate](https://github.com/sidneyp/neural-cellular-robot-substrate)
 
-
+## The folder structure:
+´´´
+.
+├── experiments                                  Example experiment folder
+│   ├── anca_run_folder                          ANCA superfolders (per experiment)
+│   │   ├── run_nr_X_folder                      A specific run, labelled by time and date
+│   │   ├── folder data                          Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
+│   ├── cnn_superfolder                          CNN experiments
+│   │   ├── cnn_run_folder                       CNN superfolder (per experiment)
+│   │   │   ├── run_nr_X_folder                  A specific run, labelled by time and date
+│   │   │   ├── folder data                       Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
+├── src
+│   ├── _moving_nca.py                           The outdated ANCA
+│   ├── animate.py                               The animation function used when visualizing from main
+│   ├── data_processing.py                       Data loading and pre-processing
+│   ├── logger.py                                The Logger object for logging runs
+│   ├── loss.py                                  All loss and accuracy metrics
+│   ├── moving_nca_no_tf.py                      The ANCA
+│   ├── perception_matrix.py                     The perception matrix init / mapping from substrate to image
+│   ├── plotting_utils.py                        Utils for plotting in test scripts
+│   └── utils.py                                 Utils for src and main
+├── tests                                        Various tests
+│   ├── test_loss.py
+│   ├── test_moving_nca.py
+│   ├── test_perception_matrix.py
+│   ├── thinking_about_loss_energy.py
+│   ├── thinking_about_normalized_positions.py      
+│   └── thinking_about_plt_Rectangle.py
+├── cnn.py                                       All code to do with CNN data generation
+├── common_funcs.py                              Funcs for many test-scripts
+├── config                                       Example config
+├── img                                          Image folder
+├── inspect_focus.py                             File used to generate active sensing plots
+├── main.py                                      Train, test and visualize
+├── plot_runs.py                                 Plot one run
+├── plot_tuning.py                               Plot a folder of runs 
+├── print_stats.py                               Print stats (accuracy, loss) for a folder of runs
+├── requirements.txt                             Requirements for MacOS
+├── requirements_linux.txt                       Likewise, Linux
+├── zero_shot_damage.py                          Used to test fault tolerance/robustness
+├── zero_shot_robustness_vs_scalability.py       Used to plot robustness versus scalability
+└── zero_shot_scalability.py                     Used to test scalability
+´´´
 
