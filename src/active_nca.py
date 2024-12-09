@@ -1,3 +1,11 @@
+"""
+The ActiveNCA class represents an active neural cellular automata (ANCA) architecture.
+
+It is implemented in numpy, which for the optimization used proved to be the fastest version
+(mostly because of the speedup of numba, using CPUs, and not needing the functionality of tensorflow).
+However, it also possible to make the architecture in tensorflow or similar.
+"""
+
 import copy
 
 import numpy as np
