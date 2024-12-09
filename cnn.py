@@ -22,10 +22,10 @@ from tensorflow.keras import optimizers
 from tensorflow.keras.layers import Conv2D, Dense, Flatten, MaxPooling2D
 from tqdm import tqdm
 
+# Globals
 CLASSES = (0, 1, 2, 3, 4)
-trained_image_size = 28
-img_channels = 1
-fashion = False
+trained_image_size = 28  # 28x28
+img_channels = 1  # 1 or 3, 3 if colors, 1 if grayscale
 
 # Data
 data_func = get_MNIST_data
@@ -35,12 +35,12 @@ kwargs = {
     "colors": True if img_channels == 3 else False,
 }
 
-
+# Because all datasets are required to be balanced, we need to find the largest dataset possible for a given data_func
 samples_per_digit = get_max_samples_balanced(data_func, **kwargs, test=False)
-
 samples_per_digit_test = get_max_samples_balanced(data_func, **kwargs, test=True)
 
 
+# The CNN model to be used. It is a convolutional neural network, very simple, but works well
 class CNN(tf.keras.Model):
     def __init__(self, digits=5, img_dim=(trained_image_size, trained_image_size, img_channels)):
         super().__init__()
@@ -57,18 +57,6 @@ class CNN(tf.keras.Model):
             ]
         )
 
-        """self.dmodel = tf.keras.Sequential(
-            [
-                Conv2D(32, 4, padding="valid", input_shape=img_dim, activation="relu"),
-                MaxPooling2D(pool_size=(2, 2)),
-                Conv2D(32, 4, padding="valid", activation="relu"),
-                MaxPooling2D(pool_size=(2, 2)),
-                Flatten(),
-                Dense(128, activation="relu"),
-                Dense(digits, activation="relu"),
-            ]
-        )"""
-
         N, M, O = img_dim
         out = self(tf.zeros([1, N, M, O]))  # dummy calls to build the model
 
@@ -81,30 +69,36 @@ class CNN(tf.keras.Model):
 
 
 def plot_history(history):
+    """
+    Plots the training history of a model.
+
+    This function takes the history object returned by a Keras model's `fit` method
+    and plots the training loss and categorical accuracy over epochs.
+
+    Args:
+        history: A Keras History object containing the training loss and accuracy
+                information.
+    """
     plt.plot(history.history["loss"], label="loss")
     plt.plot(history.history["categorical_accuracy"], label="accuracy")
     plt.legend()
     plt.show()
 
 
-def resize_for_CNN(size, mnist_digits):
-    # First, get normal resized data that the MovingNCA could handle well
-    data_func = get_MNIST_data_resized
-    test_x, test_y = data_func(
-        CLASSES=mnist_digits, SAMPLES_PER_CLASS=samples_per_digit_test, size=size, verbose=False, test=True
-    )
-
-    # Then, resize to again be 56x56, with whatever information loss was incurred
-    resized_x_data = []
-    for img in test_x:
-        resized_x_data.append(
-            cv2.resize(img, (trained_image_size, trained_image_size), interpolation=cv2.INTER_NEAREST)
-        )
-
-    return np.array(resized_x_data), test_y
-
-
 def get_model(saved_model):
+    """
+    Loads a pre-trained CNN model.
+
+    This function initializes a CNN model with the specified number of output digits,
+    compiles it with Adam optimizer and categorical crossentropy loss, and loads
+    the weights from a saved model checkpoint.
+
+    Args:
+        saved_model (str): The file path to the saved model weights.
+
+    Returns:
+        model (tf.keras.Model): The compiled CNN model with loaded weights.
+    """
     model = CNN(digits=len(CLASSES))
     model.compile(
         optimizers.Adam(lr=1e-4),
@@ -115,31 +109,19 @@ def get_model(saved_model):
     return model
 
 
-def plot_image_scale_always_full_size():
-    model = get_model()
-
-    losses = []
-    accuracies = []
-
-    start_size = 7
-
-    for size in range(start_size, trained_image_size + 1):
-        # Get data
-        test_x, test_y = resize_for_CNN(size, CLASSES)
-
-        # Evaluate model at this size
-        test_loss, test_acc = model.evaluate(test_x, test_y)
-        losses.append(test_loss)
-        accuracies.append(test_acc)
-
-    plt.plot(range(start_size, trained_image_size + 1), losses, label="Loss")
-    plt.plot(range(start_size, trained_image_size + 1), accuracies, label="Accuracy")
-    plt.legend()
-    plt.show()
-
-
 def print_mean_score(path):
+    """
+    Prints the mean accuracy score of all models in the given directory tree.
 
+    This function is used to quickly get the mean accuracy score of all models
+    in a directory tree. The mean accuracy score is calculated by loading each
+    model, evaluating it on the test data, and then taking the mean of all those
+    scores.
+
+    Args:
+        path (str): The directory path to look for models in.
+    """
+    # Buffering the prints because the tensorflow functions are very verbose
     to_print = []
     for mode, sample_number in zip(["train", "test"], [samples_per_digit, samples_per_digit_test]):
         # Get data
@@ -156,14 +138,33 @@ def print_mean_score(path):
                 test_loss, test_acc = model.evaluate(images, labels)
                 all_scores[sub_path] = test_acc
 
+        # Buffer the prints
         to_print.append(mode.capitalize() + ": " + str(np.mean(list(all_scores.values()))))
 
+    # Print
     for line in to_print:
         print(line)
-    input()
+    input()  # Again, verbosity is high, so just makign sure I will see the prints
 
 
 def plot_state_damage(silencing=True, type="square", plot=False):
+    """
+    Analyzes the effect of state damage on CNN model accuracy.
+
+    This function evaluates the impact of silencing or altering
+    feature maps in a trained CNN model for a given dataset,
+    using different damage methods (e.g., random or square).
+    The results are plotted and saved as a JSON file for further analysis.
+
+    Args:
+        silencing (bool): If True, feature maps are silenced; if False,
+                          they are altered using bias and ReLU.
+        type (str): The method of selecting cells to alter
+                    ("random" or "square").
+        plot (bool): If True, plots the accuracy scores against
+                     the percentage of silenced cells.
+    """
+    # Import damage methods
     from zero_shot_damage import (
         alter_divisible,
         flip_values,
@@ -175,7 +176,7 @@ def plot_state_damage(silencing=True, type="square", plot=False):
     )
 
     # The folder to plot from
-    path = "./experiments/cnn/mnist10/"
+    path = "./experiments/cnn/mnist5/"
 
     # Get data
     images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=40, verbose=False, test=True)
@@ -263,133 +264,23 @@ def plot_state_damage(silencing=True, type="square", plot=False):
     json.dump(all_scores, open(path + f"/{type}_{name_add}_robustness.json", "w"))
 
 
-def plot_image_noise_robustness():
-    from zero_shot_noise_perturbations import add_noise
-
-    # The folder to plot from
-    path = "./experiments/cnn/mnist3/"
-
-    # The noise to test
-    to_test = np.linspace(0, 1.0, 11)
-    NUM_DATA = 40
-
-    # Get data
-    images, labels = data_func(CLASSES=CLASSES, SAMPLES_PER_CLASS=NUM_DATA, verbose=False, test=True)
-    true_digits = np.argmax(labels, axis=1)
-
-    # Get scores
-    all_scores = {}
-
-    for sub_path in os.listdir(path):
-        if os.path.isdir(path + sub_path):
-            saved_model = path + sub_path + "/checkpoint_model.ckpt"
-            model = get_model(saved_model)
-
-            accuracies = []
-
-            for noise in to_test:
-
-                # Add noise
-                images_noisy = add_noise(images, noise)
-
-                # Get accuracies
-                predictions = model.predict(images_noisy)
-
-                acc = tf.keras.metrics.CategoricalAccuracy()
-                acc.update_state(labels, predictions)
-                accuracies.append(float(acc.result().numpy()))
-
-            all_scores[sub_path] = list(accuracies)
-
-    # Plot
-    for key, value in all_scores.items():
-        plt.plot(to_test, value, label=key)
-
-    ax = plt.gca()
-    ax.set_yticks(np.arange(0, 1.1, 0.1), range(0, 110, 10))
-    ax.set_xticks(to_test)
-    ax.set_ylabel("Accuracy (%)")
-    ax.set_xlabel("Randomly silenced cells (%)")
-
-    plt.show()
-
-    print(all_scores)
-
-    # Save
-    all_scores["test_sizes"] = to_test.tolist()
-    json.dump(all_scores, open(path + "/image_noise_robustness.json", "w"))
-
-
-def plot_image_scale():
-    model = get_model()
-
-    losses = []
-    accuracies = []
-
-    for size in range(7, trained_image_size + 1):
-        # Get data
-        test_x, test_y = get_MNIST_data_resized(
-            CLASSES=CLASSES, SAMPLES_PER_CLASS=samples_per_digit_test, size=size, verbose=False, test=True
-        )
-
-        # Pad with zeros so that the network will accept it
-        diff = trained_image_size - size
-        diff_x, diff_y = int(np.floor(diff / 2)), int(np.ceil(diff / 2))
-
-        test_x = np.pad(test_x, ((0, 0), (diff_x, diff_y), (diff_x, diff_y)), "constant")
-
-        # Evaluate model at this size
-        test_loss, test_acc = model.evaluate(test_x, test_y)
-        losses.append(test_loss)
-        accuracies.append(test_acc)
-
-    plt.plot(range(7, trained_image_size + 1), losses, label="Loss")
-    plt.plot(range(7, trained_image_size + 1), accuracies, label="Accuracy")
-    plt.legend()
-    plt.show()
-
-
-def plot_picture_damage():
-    model = get_model()
-
-    test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=1, test=True)
-    B, N, M, _ = test_x.shape
-
-    radius = 10
-    scores = np.zeros((N, M))
-
-    for x in tqdm(range(N)):
-        for y in range(M):
-            # Silencing a circle
-            x_list, y_list = [], []
-            for i in range(N):
-                for j in range(M):
-                    if np.sqrt((i - x) ** 2 + (j - y) ** 2) < radius:
-                        x_list.append(i)
-                        y_list.append(j)
-
-            x_list = np.array(x_list)
-            y_list = np.array(y_list)
-
-            # Setting the circle to zero
-            training_data_copy = deepcopy(test_x)
-            training_data_copy[:, x_list, y_list] = 0
-
-            # Evaluate model at this size
-            test_loss, test_acc = model.evaluate(training_data_copy, test_y, verbose=0)
-
-            scores[x, y] = test_acc
-
-    im = plt.imshow(scores * 100, vmin=0.0, vmax=100)
-    cb = plt.colorbar(im, ax=[plt.gca()], location="right")
-    plt.xticks([])
-    plt.yticks([])
-    plt.show()
-
-
 def main():
+    """
+    Train a CNN on current data_func.
+
+    The CNN is trained on current data_func with a custom loss function which is a combination of categorical cross-entropy and an L2 regularization term.
+    The model is trained for 30 epochs with a batch size of 200.
+    The model is then evaluated on the test set and the test accuracy is printed.
+    The model is then saved to a checkpoint file.
+
+    Returns:
+        float: The test accuracy of the model.
+    """
     train_batches = 200
     train_epochs = 30
+
+    # Change this so it corresponds with the globals
+    superfolder = "mnist5"
 
     # Make a unique experiment folder name by the time and date
     name = f"{time.localtime().tm_mday}-{time.localtime().tm_mon}-" + str(time.localtime().tm_year)[-2:]
@@ -398,18 +289,19 @@ def main():
     # Sometimes, the path is already made. Add a unique numerical suffix
     additive = 2
     new_name = name
-    while os.path.isdir(f"./experiments/cnn/mnist5/{new_name}"):
+    while os.path.isdir(f"./experiments/cnn/{superfolder}/{new_name}"):
         new_name = name + "_" + str(additive)
         additive += 1
 
-    saved_model = f"./experiments/cnn/mnist5/{new_name}/checkpoint_model.ckpt"
+    saved_model = f"./experiments/cnn/{superfolder}/{new_name}/checkpoint_model.ckpt"
 
-    # Script wide functions
+    # Get data
     train_x, train_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit)
     test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
 
     model = CNN(digits=len(CLASSES))
 
+    # Create a custom loss function that corresponds with the energy loss function in the paper
     class EnergyLoss(tf.keras.losses.Loss):
         def __init__(self, rate=0.01):
             super().__init__()
@@ -418,38 +310,54 @@ def main():
         def call(self, y_true, y_pred):
             return np.sum(y_pred**2) * self.rate
 
+    # Make sure it doesn't use softmax, because we already do it in the model
     model.compile(
         optimizers.Adam(lr=1e-4),
         loss=[tf.keras.losses.CategoricalCrossentropy(from_logits=False), EnergyLoss(rate=0.0001)],
         metrics=[tf.keras.metrics.CategoricalAccuracy()],
     )
 
+    # Train
     history = model.fit(train_x, train_y, batch_size=train_batches, epochs=train_epochs)
 
+    # Evaluate
     test_loss, test_acc = model.evaluate(test_x, test_y)
     print("Test loss:", test_loss)
     print("Test accuracy:", test_acc)
 
+    # Plot
     plot_history(history)
 
+    # Save
     model.save_weights(saved_model)
     return test_acc
 
 
-def confusion_matrix():
-    model = get_model()
+def confusion_matrix(path):
+    """
+    Loads a CNN model and evaluates it on the test data, then computes the
+    confusion matrix and plots it.
+
+    Args:
+        path (str): The path to the model checkpoint file.
+    """
+    model = get_model(path)
     test_x, test_y = data_func(**kwargs, SAMPLES_PER_CLASS=samples_per_digit_test, test=True)
 
+    # Get predictions
     predictions = model.predict(test_x)
     predictions = np.argmax(predictions, axis=1)
     test_y = np.argmax(test_y, axis=1)
 
+    # Compute confusion matrix
     confusion = np.zeros((len(CLASSES), len(CLASSES)))
     for pred, real in zip(predictions, test_y):
         confusion[pred, real] += 1
 
+    # Normalize
     confusion /= samples_per_digit_test
 
+    # Plot
     plt.title("CNN confusion matrix")
     sns.heatmap(confusion, annot=True, cmap="plasma")
     plt.ylabel("Guess")
@@ -457,63 +365,6 @@ def confusion_matrix():
     plt.show()
 
 
-def find_easiest_digits():
-    global CLASSES
-    global kwargs
-    global samples_per_digit
-
-    combinations = get_unique_lists(
-        [1, 2, 3, 4, 5, 6, 7, 8], 5
-    )  # Removes (automobile/truck 1/9 and plane/bird 0/2 choice)
-    print("Found", len(combinations), "combinations")
-
-    accuracies = []
-    for i, list_i in enumerate(combinations):
-        print(i, ":", list_i)
-        CLASSES = list_i
-        kwargs = {
-            "CLASSES": CLASSES,
-            "verbose": False,
-            "colors": True if img_channels == 3 else False,
-        }
-
-        if "MNIST" in str(data_func):
-            samples_per_digit = get_max_samples_balanced(CLASSES=CLASSES, test=False, fashion=fashion)
-            print(samples_per_digit)
-        elif "CIFAR" in str(data_func):
-            samples_per_digit = get_max_samples_balanced_cifar(CLASSES=CLASSES, test=False, colors=kwargs["colors"])
-        else:
-            print("OOOPS")
-
-        acc = main()
-        accuracies.append(acc)
-        print("Acc:", acc, "\n")
-
-    scores_dict = {}
-    for list_i, acc in zip(combinations, accuracies):
-        scores_dict[str(list_i)] = acc
-
-    sorted_dict = dict(sorted(scores_dict.items(), key=lambda item: item[1]))
-
-    for key, item in sorted_dict.items():
-        print(key, ":", item)
-
-
 if __name__ == "__main__":
-    """for silencing in [True, False]:
-    for type in ["square"]:
-        if silencing is True and type == "random":
-            continue
-        plot_state_damage(silencing=silencing, type=type, plot=False)"""
-
-    # main()
-
-    """saved_model = "./experiments/cnn/mnist3/10-9-24_17:10/checkpoint_model.ckpt"
-    model = get_model(saved_model)
-
-    from IPython import embed
-
-    embed()"""
-
     path = "./experiments/cnn/mnist5/"
     print_mean_score(path)
