@@ -50,11 +50,11 @@ Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellu
 │   │   │   ├── run_nr_X_folder                  A specific run, labelled by time and date
 │   │   │   ├── folder data                       Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
 ├── src
+│   ├── active_nca.py                            The ActiveNCA and supporting functions
 │   ├── animate.py                               The animation function used when visualizing from main
 │   ├── data_processing.py                       Data loading and pre-processing
 │   ├── logger.py                                The Logger object for logging runs
 │   ├── loss.py                                  All loss and accuracy metrics
-│   ├── active_nca.py                            The ActiveNCA and supporting functions
 │   ├── perception_matrix.py                     The perception matrix init / mapping from substrate to image
 │   ├── plotting_utils.py                        Utils for plotting in test scripts
 │   └── utils.py                                 Utils for src and main
