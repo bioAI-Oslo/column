@@ -39,7 +39,7 @@ Code mainly produced by: Mia-Katrin Kvalsund
 Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellular Robot Substrate](https://github.com/sidneyp/neural-cellular-robot-substrate)
 
 ## The folder structure:
-```python
+```
 .
 ├── experiments                                  Example experiment folder
 │   ├── anca_run_folder                          ANCA superfolders (per experiment)
