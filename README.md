@@ -48,7 +48,11 @@ Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellu
 │   ├── cnn_superfolder                          CNN experiments
 │   │   ├── cnn_run_folder                       CNN superfolder (per experiment)
 │   │   │   ├── run_nr_X_folder                  A specific run, labelled by time and date
-│   │   │   ├── folder data                       Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
+│   │   │   ├── folder data                      Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
+│   ├── vit_superfolder                          ViT experiments
+│   │   ├── vit_run_folder                       ViT superfolder (per experiment)
+│   │   │   ├── run_nr_X_folder                  A specific run, labelled by time and date
+│   │   │   ├── folder data                      Specific data about all the runs in this folder (such as accuracy, scalability, etc.)
 ├── src
 │   ├── active_nca.py                            The ActiveNCA and supporting functions
 │   ├── animate.py                               The animation function used when visualizing from main
