@@ -80,6 +80,7 @@ Some of Sidney Pontes-Filho's code is also used from this project: [Neural Cellu
 ├── print_stats.py                               Print stats (accuracy, loss) for a folder of runs
 ├── requirements.txt                             Requirements for MacOS
 ├── requirements_linux.txt                       Likewise, Linux
+├── vit.py                                       All code to do with ViT data generation
 ├── zero_shot_damage.py                          Used to test fault tolerance/robustness
 ├── zero_shot_robustness_vs_scalability.py       Used to plot robustness versus scalability
 └── zero_shot_scalability.py                     Used to test scalability
