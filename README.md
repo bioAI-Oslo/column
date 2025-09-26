@@ -28,7 +28,7 @@ python3 plot_runs.py path/to/your/experiment/folder
 
 Path can be absolute or relative. 
 
-The folder "src" contains the functionality used in main.py. Most notably, "moving_nca_no_tf.py" contains the class of the new system. But keep in mind that how to train the system lies in main.py. 
+The folder "src" contains the functionality used in main.py. Most notably, "active_nca.py" contains the class of the new system. But keep in mind that how to train the system lies in main.py. 
 
 ## Authors
 

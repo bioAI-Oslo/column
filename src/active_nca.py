@@ -82,7 +82,7 @@ class ActiveNCA:
         self._size_active = (size_image[0] - 2, size_image[1] - 2)
 
         self.img_channels = img_channels
-        self.act_channels = 2 if moving else 0
+        self.act_channels = 2 if moving == True else 0
         self.num_classes = len(mnist_digits)
         self.num_hidden = num_hidden
         self.input_dim = self.img_channels + self.num_hidden + self.num_classes
@@ -216,9 +216,16 @@ class ActiveNCA:
             )
 
             # Update the perception
-            if self.moving:
+            if self.moving == True:
                 alter_perception_slicing_batched(
                     self.perceptions_batched, outputs[:, :, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
+                )
+            if self.moving == "random":
+                # Generate random actions between -0.5 and 0.5
+                rand_actions = np.random.rand(B, N_neo, M_neo, 2) - 0.5
+
+                alter_perception_slicing_batched(
+                    self.perceptions_batched, rand_actions, N_neo, M_neo, N_active, M_active
                 )
 
         # I should really phase out having guesses here, I don't use it for anything...
@@ -268,16 +275,21 @@ class ActiveNCA:
             )
 
             # Update the perception if moving
-            if self.moving:
+            if self.moving == True:
                 alter_perception_slicing(
                     self.perceptions, outputs[:, :, -self.act_channels :], N_neo, M_neo, N_active, M_active
                 )
+            if self.moving == "random":
+                # Generate random actions between -0.5 and 0.5
+                rand_actions = np.random.rand(N_neo, M_neo, 2) - 0.5
+
+                alter_perception_slicing(self.perceptions, rand_actions, N_neo, M_neo, N_active, M_active)
 
             # Collect visualization info if needed
             if visualize:
                 self.images.append(copy.deepcopy(img_raw))
                 self.states.append(copy.deepcopy(self.state))
-                if self.moving:
+                if self.moving == True:
                     self.actions.append(copy.deepcopy(outputs[:, :, -self.act_channels :]))
                 self.perceptions_through_time.append(copy.deepcopy(self.perceptions))
 
