@@ -135,7 +135,7 @@ def get_simple_pattern(verbose=False, **kwargs):
     return training_data, target_data
 
 
-def get_simple_object(verbose=False, size=18, **kwargs):
+def get_simple_object(verbose=False, SAMPLES_PER_CLASS=10, size=18, **kwargs):
     """Only for quick testing"""
 
     def mug_image_gen(N, M):
@@ -188,6 +188,10 @@ def get_simple_object(verbose=False, size=18, **kwargs):
 
     training_data = np.array([cup_pattern, knife_pattern, bowl_pattern])
     target_data = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32)
+
+    # Expanding to get the desired amount of samples per class
+    training_data = np.array([training_data[i] for _ in range(SAMPLES_PER_CLASS) for i in range(len(training_data))])
+    target_data = np.array([target_data[i] for _ in range(SAMPLES_PER_CLASS) for i in range(len(target_data))])
 
     return training_data, target_data
 
