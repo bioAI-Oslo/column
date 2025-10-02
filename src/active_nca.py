@@ -53,6 +53,7 @@ class ActiveNCA:
         mnist_digits=(0, 3, 4),
         labels=None,
         activation=None,
+        selection=False,
     ):
         """
         Initialize an ActiveNCA instance.
@@ -72,6 +73,7 @@ class ActiveNCA:
             mnist_digits (tuple, optional): Tuple of MNIST digits to be used. Defaults to (0, 3, 4).
             labels (list or None, optional): Optional labels for the data. Defaults to None.
             activation (str or None, optional): Activation function to be used. If None, defaults to a linear activation. Defaults to linear if None.
+            selection (bool, optional): Whether to use selection or not. Defaults to False.
 
         """
         if size_image is None:
@@ -111,6 +113,12 @@ class ActiveNCA:
         # Add the output layer
         self.weight_shape_list.append((hidden_neurons[-1], self.output_dim))
         self.weight_shape_list.append((self.output_dim))
+
+        # Add the selection layer. Now the selection layer will be last
+        self.selection = selection
+        if selection:
+            self.weight_shape_list.append((self.num_classes * 3 * 3, 1))  #  + self.position_addon
+            self.weight_shape_list.append((1))
 
         # Init the weights and the weight amounts list
         self.weights = []
@@ -228,8 +236,27 @@ class ActiveNCA:
                     self.perceptions_batched, rand_actions, N_neo, M_neo, N_active, M_active
                 )
 
+        output = self.state_batched[:, :, :, -self.num_classes :]  # Only the class channels, but keep the padded size
+        if self.selection and (step is None or step == self.iterations - 1):
+            input_to_select = np.empty((B * N_neo * M_neo, 3 * 3 * self.num_classes))  # + self.position_addon))
+            collect_input_to_select_batched(
+                input_to_select, output, self.perceptions_batched, self.position, N_neo, M_neo
+            )
+
+            # Get the weight for each output pixel
+            select_weights_flat = self.selection_layer(input_to_select)
+            select_weights = np.reshape(select_weights_flat, (B, N_neo, M_neo, 1))
+
+            # Apply the weight to the output
+            output = output[:, 1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
+
+            # Take the mean across N_neo and M_neo, but keep those dimensions
+            # output = np.mean(output, axis=(1, 2), keepdims=True)  # Remember to change lambda if this is changed
+
+            return output, guesses
+
         # I should really phase out having guesses here, I don't use it for anything...
-        return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
+        return output[:, 1 : 1 + N_neo, 1 : 1 + M_neo], guesses
 
     def classify(self, img_raw, visualize=False, step=None, correct_label_index=None):  # , silencing_indexes=None):
         """
@@ -311,7 +338,26 @@ class ActiveNCA:
             self.actions = None
             self.perceptions_through_time = None
 
-        return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
+        output = self.state[:, :, -self.num_classes :]
+        if self.selection and (step is None or step == self.iterations - 1):
+            input_to_select = np.empty((1 * N_neo * M_neo, 3 * 3 * self.num_classes))  # + self.position_addon))
+            collect_input_to_select_batched(
+                input_to_select, output[None], self.perceptions[None], self.position, N_neo, M_neo
+            )
+
+            # Get the weight for each output pixel
+            select_weights_flat = self.selection_layer(input_to_select)
+            select_weights = np.reshape(select_weights_flat, (N_neo, M_neo, 1))
+
+            # Apply the weight to the output
+            output = output[1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
+
+            # Take the mean across N_neo and M_neo, but keep those dimensions
+            # output = np.mean(output, axis=(0, 1), keepdims=True) # Remember to change lambda if this is changed
+
+            return output, guesses
+
+        return output[1 : 1 + N_neo, 1 : 1 + M_neo, :], guesses
 
     def visualize(
         self,
@@ -376,6 +422,7 @@ class ActiveNCA:
         mnist_digits=(0, 3, 4),
         labels=None,
         activation=None,
+        selection=False,
     ):
         """
         Get an instance of the ActiveNCA class with the given parameters and set its weights to the given flat weights.
@@ -411,6 +458,7 @@ class ActiveNCA:
             mnist_digits=mnist_digits,
             labels=labels,
             activation=activation,
+            selection=selection,
         )
 
         network.set_weights(flat_weights)
@@ -435,15 +483,24 @@ class ActiveNCA:
         The model is then stored in the object as self.dmodel.
         """
 
-        # Func is a feed forward network that takes input x and returns output y
-        def func(x):
-            res = x
-            for i in range(0, len(self.weights) - 2, 2):
-                res = self.activation(layer_math(res, self.weights[i], self.weights[i + 1]))
+        def get_network(weights):
+            # Func is a feed forward network that takes input x and returns output y
+            def func(x):
+                res = x
+                for i in range(0, len(weights) - 2, 2):
+                    res = self.activation(layer_math(res, weights[i], weights[i + 1]))
 
-            return layer_math(res, self.weights[-2], self.weights[-1])
+                return layer_math(res, weights[-2], weights[-1])
 
-        self.dmodel = func
+            return func
+
+        if self.selection:
+            self.dmodel = get_network(self.weights[:-2])
+            self.selection_layer = get_network(
+                self.weights[-2:]
+            )  # For now, the selection layer is simply linear. Consider sigmoid
+        else:
+            self.dmodel = get_network(self.weights)
 
 
 def custom_round_slicing(x: list):
@@ -683,6 +740,20 @@ def collect_input_batched(
             M_neo,
         )
         input[i * N_neo * M_neo : (i + 1) * N_neo * M_neo] = input_inner"""
+
+
+def collect_input_to_select_batched(input_to_select, output, perceptions_batched, position, N_neo, M_neo):
+    B = len(output)
+    for x in range(N_neo):
+        for y in range(M_neo):
+            for b in range(B):
+                dummy_flat = output[b, x : x + 3, y : y + 3, :].flatten()
+                input_to_select[b * N_neo * M_neo + x * M_neo + y, : len(dummy_flat)] = dummy_flat
+
+                """if position == "current":
+                    x_p, y_p = perceptions_batched[b, x, y].T
+                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p / (N_neo - 1)) * 2 - 1
+                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p / (M_neo - 1)) * 2 - 1"""
 
 
 def get_dimensions(data_shape, neo_shape):

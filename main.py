@@ -103,6 +103,7 @@ def get_from_config(config):
         "mnist_digits": mnist_digits,
         "labels": mnist_digits,
         "activation": config.network.activation_function,
+        "selection": config.network.selection,
     }
 
     # Data function and kwargs
