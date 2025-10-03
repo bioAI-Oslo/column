@@ -251,7 +251,7 @@ class ActiveNCA:
             output = output[:, 1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
 
             # Take the mean across N_neo and M_neo, but keep those dimensions
-            output = np.mean(output, axis=(1, 2), keepdims=True)  # Remember to change lambda if this is changed
+            # output = np.mean(output, axis=(1, 2), keepdims=True)  # Remember to change lambda if this is changed
 
             return output, guesses
 
@@ -353,7 +353,7 @@ class ActiveNCA:
             output = output[1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
 
             # Take the mean across N_neo and M_neo, but keep those dimensions
-            output = np.mean(output, axis=(0, 1), keepdims=True)  # Remember to change lambda if this is changed
+            # output = np.mean(output, axis=(0, 1), keepdims=True) # Remember to change lambda if this is changed
 
             return output, guesses
 
