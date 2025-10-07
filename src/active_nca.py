@@ -117,7 +117,7 @@ class ActiveNCA:
         # Add the selection layer. Now the selection layer will be last
         self.selection = selection
         if selection:
-            self.weight_shape_list.append((self.num_classes * 3 * 3, 1))  #  + self.position_addon
+            self.weight_shape_list.append((self.num_classes * 3 * 3 + self.position_addon, 1))
             self.weight_shape_list.append((1))
 
         # Init the weights and the weight amounts list
@@ -238,7 +238,7 @@ class ActiveNCA:
 
         output = self.state_batched[:, :, :, -self.num_classes :]  # Only the class channels, but keep the padded size
         if self.selection and (step is None or step == self.iterations - 1):
-            input_to_select = np.empty((B * N_neo * M_neo, 3 * 3 * self.num_classes))  # + self.position_addon))
+            input_to_select = np.empty((B * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
             collect_input_to_select_batched(
                 input_to_select, output, self.perceptions_batched, self.position, N_neo, M_neo
             )
@@ -340,7 +340,7 @@ class ActiveNCA:
 
         output = self.state[:, :, -self.num_classes :]
         if self.selection and (step is None or step == self.iterations - 1):
-            input_to_select = np.empty((1 * N_neo * M_neo, 3 * 3 * self.num_classes))  # + self.position_addon))
+            input_to_select = np.empty((1 * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
             collect_input_to_select_batched(
                 input_to_select, output[None], self.perceptions[None], self.position, N_neo, M_neo
             )
@@ -750,10 +750,10 @@ def collect_input_to_select_batched(input_to_select, output, perceptions_batched
                 dummy_flat = output[b, x : x + 3, y : y + 3, :].flatten()
                 input_to_select[b * N_neo * M_neo + x * M_neo + y, : len(dummy_flat)] = dummy_flat
 
-                """if position == "current":
+                if position == "current":
                     x_p, y_p = perceptions_batched[b, x, y].T
                     input_to_select[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p / (N_neo - 1)) * 2 - 1
-                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p / (M_neo - 1)) * 2 - 1"""
+                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p / (M_neo - 1)) * 2 - 1
 
 
 def get_dimensions(data_shape, neo_shape):
