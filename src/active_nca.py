@@ -752,8 +752,13 @@ def collect_input_to_select_batched(input_to_select, output, perceptions_batched
 
                 if position == "current":
                     x_p, y_p = perceptions_batched[b, x, y].T
-                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -2] = (x_p / (N_neo - 1)) * 2 - 1
-                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -1] = (y_p / (M_neo - 1)) * 2 - 1
+                    # Must catch the case when N_neo == 1 or M_neo == 1, which doesn't happen in collect_input functions
+                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -2] = (
+                        0 if N_neo == 1 else (x_p / (N_neo - 1)) * 2 - 1
+                    )
+                    input_to_select[b * N_neo * M_neo + x * M_neo + y, -1] = (
+                        0 if M_neo == 1 else (y_p / (M_neo - 1)) * 2 - 1
+                    )
 
 
 def get_dimensions(data_shape, neo_shape):
