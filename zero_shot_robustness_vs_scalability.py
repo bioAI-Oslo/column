@@ -1,6 +1,7 @@
 import json
 import os
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -8,6 +9,21 @@ import seaborn as sns
 from localconfig import config
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+
+# "#7597FF" "#6A52DC" "#DC267F" "#FFB000"
+
+# #7597ff #6c63e4 #a33bac #e5495e #ffb000
+
+colors = {
+    "Moving ANCA": "#DC267F",
+    "Moving ANCA 2C 40N": "#DC267F",
+    "Moving ANCA 5C 20N": "#7597FF",
+    "Non-Moving ANCA": "#FFB000",
+    "Random ANCA": "#7597FF",
+    "Selective ANCA": "#a33bac",
+    "CNN": "#00000000",  # "#f48725", # Black for appendix, orange for main results. It was hard to see the difference between the CNN and the non-moving otherwise
+    "ViT": "#6c63e4",
+}  # Modified IBM design library palette
 
 
 def get_score_robustness(folder_dict):
@@ -69,55 +85,63 @@ def get_sizes(folder_dict):
     return sizes
 
 
-def plot_robustness():
+def plot_robustness(folders, line=True, silencing_method="square"):
     sns.set()
 
-    folder_moving = "experiments/mnist3_robust_26"
-    folder_nonmoving = "experiments/mnist3_robust_nonmoving_26"
-    folder_cnn = "experiments/cnn/mnist3"
+    file_name = f"/{silencing_method}_silencing_robustness.json"
 
-    folder_robustness_moving = json.load(open(folder_moving + "/square_silencing_robustness.json"))
-    folder_robustness_nonmoving = json.load(open(folder_nonmoving + "/square_silencing_robustness.json"))
-    folder_robustness_cnn = json.load(open(folder_cnn + "/square_silencing_robustness.json"))
+    for name in folders.keys():
 
-    colors = {"moving": "tab:blue", "nonmoving": "tab:orange", "cnn": "tab:green"}
+        folder_robustness = json.load(open(folders[name] + file_name))
 
-    for name, folder in zip(
-        ["moving", "nonmoving", "cnn"], [folder_robustness_moving, folder_robustness_nonmoving, folder_robustness_cnn]
-    ):
         scores = []
 
-        xs = []
-        ys = []
-
-        for key in folder.keys():
+        for key in folder_robustness.keys():
             if key == "test_sizes":
                 continue
 
-            if "moving" in name:
-                config.read(key + "/config")
-                if config.scale.train_n_neo != 26:
-                    continue
-
-            scores.append(folder[key])
-
-            for x, y in zip(folder["test_sizes"], folder[key]):
-                xs.append(x)
-                ys.append(y)
+            scores.append(folder_robustness[key])
 
         mean = np.mean(scores, axis=0)
         print(name, mean)
 
-        plt.scatter(xs, ys, alpha=0.5, color=colors[name])
-
-        plt.plot(folder["test_sizes"], mean, label=name, linewidth=3, alpha=0.8, color=colors[name])
+        plt.plot(folder_robustness["test_sizes"], mean, label=name, linewidth=3, alpha=0.8, color=colors[name])
         plt.fill_between(
-            folder["test_sizes"],
+            folder_robustness["test_sizes"],
             mean - np.std(scores, axis=0),
             mean + np.std(scores, axis=0),
-            alpha=0.2,
+            alpha=0.1,
             color=colors[name],
         )
+
+        if line:
+            for key in folder_robustness.keys():
+                if key == "test_sizes":
+                    continue
+
+                plt.plot(
+                    folder_robustness["test_sizes"],
+                    folder_robustness[key],
+                    linestyle="--",
+                    linewidth=1,
+                    alpha=0.5,
+                    color=colors[name],
+                )
+                scores.append(folder_robustness[key])
+        else:
+            xs = []
+            ys = []
+            for key in folder_robustness.keys():
+                if key == "test_sizes":
+                    continue
+
+                scores.append(folder_robustness[key])
+
+                for x, y in zip(folder_robustness["test_sizes"], folder_robustness[key]):
+                    xs.append(x)
+                    ys.append(y)
+
+            plt.scatter(xs, ys, alpha=0.5, color=colors[name])
 
     plt.xticks(np.linspace(0.0, 1.0, 11), np.round(np.linspace(0, 100, 11)).astype(int))
     plt.yticks(np.linspace(0.0, 1.0, 11), np.round(np.linspace(0, 100, 11)).astype(int))
@@ -127,111 +151,114 @@ def plot_robustness():
     plt.show()
 
 
-def plot_scalability():
-    folder_moving = "experiments/mnist3_robust"
-    folder_nonmoving = "experiments/mnist3_robust_nonmoving"
+def plot_scalability(folders):
+    sns.set()
 
-    folder_robustness_moving = json.load(open(folder_moving + "/square_silencing_robustness.json"))
-    folder_robustness_nonmoving = json.load(open(folder_nonmoving + "/square_silencing_robustness.json"))
+    for name, folder in folders.items():
+        folder_scalability = json.load(open(folder + "/scalabilities.json"))
 
-    folder_scalability_moving = json.load(open(folder_moving + "/scalabilities.json"))
-    folder_scalability_nonmoving = json.load(open(folder_nonmoving + "/scalabilities.json"))
+        sizes = {}
 
-    plt.figure()
+        for key in folder_scalability.keys():
+            if key == "test_sizes":
+                continue
 
-    sizes = {}
+            config.read(key + "/config")
 
-    for key in folder_scalability_moving.keys():
-        if key == "test_sizes":
-            continue
+            if config.scale.train_n_neo not in sizes:
+                sizes[config.scale.train_n_neo] = []
 
-        config.read(key + "/config")
+            sizes[config.scale.train_n_neo].append(folder_scalability[key])
 
-        if config.scale.train_n_neo not in sizes:
-            sizes[config.scale.train_n_neo] = []
+        # IBM design library palette
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+            "", ["#648fff", "#785ef0", "#DC267F", "#f4701e", "#FFB000"]
+        )
 
-        sizes[config.scale.train_n_neo].append(folder_scalability_moving[key])
+        keys = list(sizes.keys())
+        keys.sort()
 
-    for key in sizes:
-        plt.plot(np.mean(sizes[key], axis=0), label=key)
+        plt.figure()
+        plt.title(name)
 
+        for i, key in enumerate(keys):
+            x_axis = folder_scalability["test_sizes"]
+            mean = np.mean(sizes[key], axis=0)
+            std = np.std(sizes[key], axis=0)
+            plt.plot(x_axis, mean, label=key, color=cmap(i / 5))
+            plt.fill_between(x_axis, mean - std, mean + std, color=cmap(i / 5), alpha=0.3)
+        plt.xlabel("NCA size (^2)")
+        plt.ylabel("Accuracy (%)")
+        plt.yticks(np.linspace(0.0, 1.0, 11), ["0", "", "20", "", "40", "", "60", "", "80", "", "100"])
+        plt.ylim([0, 1])
+        plt.xticks(range(1, 27), [str(size) if size in [1, 3, 5, 7, 10, 15, 20, 25, 26] else "" for size in x_axis])
+
+        plt.legend(title="Substrate sizes:", ncol=2)
     plt.show()
 
 
-def plot_robustness_vs_scalability():
-    folder_moving = "experiments/mnist3_robust"
-    folder_nonmoving = "experiments/mnist3_robust_nonmoving"
-
-    folder_robustness_moving = json.load(open(folder_moving + "/square_silencing_robustness.json"))
-    folder_robustness_nonmoving = json.load(open(folder_nonmoving + "/square_silencing_robustness.json"))
-
-    folder_scalability_moving = json.load(open(folder_moving + "/scalabilities.json"))
-    folder_scalability_nonmoving = json.load(open(folder_nonmoving + "/scalabilities.json"))
-
-    ### score begin
-
-    scores_robustness_moving = get_score_robustness(folder_robustness_moving)
-    scores_robustness_nonmoving = get_score_robustness(folder_robustness_nonmoving)
-
-    scores_scalability_moving = get_score_scalability(folder_scalability_moving)
-    scores_scalability_nonmoving = get_score_scalability(folder_scalability_nonmoving)
-
-    sizes_moving = get_sizes(folder_scalability_moving)
-    sizes_nonmoving = get_sizes(folder_scalability_nonmoving)
-
-    xs_moving, ys_moving, zs_moving = [], [], []
-    for key in scores_robustness_moving.keys():
-        print(key, scores_robustness_moving[key], scores_scalability_moving[key])
-        ys_moving.append(scores_robustness_moving[key])
-        zs_moving.append(sizes_moving[key])
-        xs_moving.append(scores_scalability_moving[key])
+def plot_robustness_vs_scalability(folders):
 
     sns.set()
 
-    plt.scatter(
-        xs_moving,
-        ys_moving,
-        s=50 + 100 * (25 < np.array(zs_moving)) + 100 * (100 < np.array(zs_moving)) + 100 * (225 < np.array(zs_moving)),
-        alpha=1 - (np.sqrt(np.array(zs_moving))) / (35),
-        label="Moving",
-    )
+    x_data = []
+    y_data = []
 
-    xs_nonmoving, ys_nonmoving, zs_nonmoving = [], [], []
-    for key in scores_robustness_nonmoving.keys():
-        print(key, scores_robustness_nonmoving[key], scores_scalability_nonmoving[key])
-        ys_nonmoving.append(scores_robustness_nonmoving[key])
-        zs_nonmoving.append(sizes_nonmoving[key])
-        xs_nonmoving.append(scores_scalability_nonmoving[key])
+    for name in folders.keys():
+        robustness_info = json.load(open(folders[name] + "/square_silencing_robustness.json"))
+        scalabilities_info = json.load(open(folders[name] + "/scalabilities.json"))
 
-    plt.scatter(
-        xs_nonmoving,
-        ys_nonmoving,
-        s=(np.array(zs_nonmoving)),
-        alpha=1 - (np.sqrt(np.array(zs_nonmoving))) / (35),
-        label="Non-Moving",
-    )
+        scores_robustnesses = get_score_robustness(robustness_info)
+        scores_scalabilities = get_score_scalability(scalabilities_info)
+        sizes = get_sizes(scalabilities_info)
 
-    """X = np.zeros((len(xs_moving) + len(xs_nonmoving), 3))
-    X[:, 0] = 1
-    X[0 : len(xs_moving), 1] = np.array(xs_moving)
-    X[len(xs_moving) :, 1] = np.array(xs_nonmoving)
-    X[0 : len(xs_moving), 2] = (np.array(xs_moving)) ** 2
-    X[len(xs_moving) :, 2] = (np.array(xs_nonmoving)) ** 2
-    
+        xs, ys, zs = [], [], []
+        for folder in scores_robustnesses.keys():
+            print(folder, scores_robustnesses[folder], scores_scalabilities[folder])
+            ys.append(scores_robustnesses[folder])
+            zs.append(sizes[folder])
+            xs.append(scores_scalabilities[folder])
 
-    Y = np.array(ys_moving + ys_nonmoving)
+        for x, y in zip(xs, ys):
+            x_data.append(x)
+            y_data.append(y)
 
-    beta = np.linalg.inv(X.T.dot(X) + 0.0001 * np.eye(X.shape[1])).dot(X.T).dot(Y)
-    print(f"robustness = {beta[0]} + {beta[1]}*scalability + {beta[2]}*exp(scalability)")
+        plt.scatter(
+            xs,
+            ys,
+            s=50 + 100 * (25 < np.array(zs)) + 100 * (100 < np.array(zs)) + 100 * (225 < np.array(zs)),
+            alpha=1 - (np.sqrt(np.array(zs))) / (35),
+            color=colors[name],
+            label=name,
+        )
 
-    X_sorted = X[np.argsort(X[:, 1])]
-    Y_pred = X_sorted.dot(beta)
+    # Compute the polynomial trend using linear regression
+    x_data = np.array(x_data)
+    y_data = np.array(y_data).reshape(-1, 1)
+    design_matrix = np.array([np.ones(len(x_data)), x_data, x_data**2]).T
+    beta = np.linalg.inv(design_matrix.T @ design_matrix) @ design_matrix.T @ y_data
+
+    plot_x = np.unique(x_data)
+    plot_y = beta[0] + beta[1] * plot_x + beta[2] * plot_x**2
+
+    predicted_y = beta[0] + beta[1] * x_data + beta[2] * x_data**2
+
+    def r2_score(y_true, y_pred):
+        ss_res = np.sum((y_true - y_pred) ** 2)
+        ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+        r2 = 1 - (ss_res / ss_tot)
+        print(ss_res, ss_tot)
+        return r2
+
+    r2 = r2_score(y_data.flatten(), np.array(predicted_y).flatten())
+    print(f"R2 score: {r2}")
+
     plt.plot(
-        X_sorted[:, 1],
-        Y_pred,
-        "r--",
-        label=f"r = {np.round(beta[0], 2)} {np.round(beta[1], 2)} $s$ + {np.round(beta[2], 2)}" + r"$e^s$",
-    )"""
+        plot_x,
+        plot_y,
+        color="black",
+        label="Trendline",
+    )
 
     plt.xlabel("Scalability")
     plt.ylabel("Robustness")
@@ -241,6 +268,79 @@ def plot_robustness_vs_scalability():
     plt.show()
 
 
-plot_robustness()
+def plot_size_vs_scalability(folders):
 
-# plot_robustness_vs_scalability()
+    sns.set()
+
+    for name in folders.keys():
+        scalabilities_info = json.load(open(folders[name] + "/scalabilities.json"))
+
+        scores_scalabilities = get_score_scalability(scalabilities_info)
+        sizes = get_sizes(scalabilities_info)
+
+        xs, ys = [], []
+        for folder in scores_scalabilities.keys():
+            ys.append(scores_scalabilities[folder])
+            xs.append(np.sqrt(sizes[folder]).astype(int))
+
+        plt.scatter(
+            xs,
+            ys,
+            color=colors[name],
+            label=name,
+        )
+
+    plt.xlabel("NCA size (^2)")
+    plt.ylabel("Scalability")
+
+    plt.legend()
+
+    plt.show()
+
+
+"""plot_robustness(
+    folders={
+        "Moving ANCA 2C 40N": "experiments/mnist_final15_2:40",
+        "Moving ANCA 5C 20N": "experiments/mnist_final15",
+        "CNN": "experiments/cnn/mnist5",
+        "ViT": "experiments/vit/mnist5",
+        # "Moving ANCA": "experiments/mnist3_robust_26",
+        # "Non-Moving ANCA": "experiments/mnist3_robust_nonmoving_26",
+        # "CNN": "experiments/cnn/mnist3",
+        # "ViT": "experiments/vit/mnist3",
+        # "Random ANCA": "experiments/mnist3_robust_random_26",
+        # "Selective ANCA": "experiments/mnist3_robust_selective_aggregated_26",
+    },
+    silencing_method="square",
+)"""
+
+"""plot_robustness_vs_scalability(
+    folders={
+        # "Moving ANCA 2C 40N": "experiments/mnist_final15_2:40",
+        # "Moving ANCA 5C 20N": "experiments/mnist_final15",
+        "Moving ANCA": "experiments/mnist3_robust",
+        "Non-Moving ANCA": "experiments/mnist3_robust_nonmoving",
+        "Random ANCA": "experiments/mnist3_robust_random",
+        "Selective ANCA": "experiments/mnist3_robust_selective_aggregated",
+    }
+)"""
+
+"""plot_size_vs_scalability(
+    folders={
+        # "Moving ANCA 2C 40N": "experiments/mnist_final15_2:40",
+        # "Moving ANCA 5C 20N": "experiments/mnist_final15",
+        "Moving ANCA": "experiments/mnist3_robust",
+        "Non-Moving ANCA": "experiments/mnist3_robust_nonmoving",
+        "Random ANCA": "experiments/mnist3_robust_random",
+        "Selective ANCA": "experiments/mnist3_robust_selective_aggregated",
+    }
+)"""
+
+plot_scalability(
+    folders={
+        "Moving ANCA": "experiments/neo_size_experiment",
+        "Non-Moving ANCA": "experiments/neo_size_experiment_nonmoving",
+        "Random ANCA": "experiments/neo_size_experiment_random",
+        "Selective ANCA": "experiments/neo_size_experiment_selective_aggregated",
+    }
+)
