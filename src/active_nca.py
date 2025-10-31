@@ -236,27 +236,43 @@ class ActiveNCA:
                     self.perceptions_batched, rand_actions, N_neo, M_neo, N_active, M_active
                 )
 
-        output = self.state_batched[:, :, :, -self.num_classes :]  # Only the class channels, but keep the padded size
         if self.selection and (step is None or step == self.iterations - 1):
-            input_to_select = np.empty((B * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
-            collect_input_to_select_batched(
-                input_to_select, output, self.perceptions_batched, self.position, N_neo, M_neo
-            )
-
-            # Get the weight for each output pixel
-            select_weights_flat = self.selection_layer(input_to_select)
-            select_weights = np.reshape(select_weights_flat, (B, N_neo, M_neo, 1))
-
-            # Apply the weight to the output
-            output = output[:, 1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
-
-            # Take the mean across N_neo and M_neo, but keep those dimensions
-            output = np.mean(output, axis=(1, 2), keepdims=True)  # Remember to change lambda if this is changed
+            output = self.aggregate_batch()
 
             return output, guesses
 
         # I should really phase out having guesses here, I don't use it for anything...
-        return output[:, 1 : 1 + N_neo, 1 : 1 + M_neo], guesses
+        return self.state_batched[:, 1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
+
+    def aggregate_batch(self):
+        """
+        Aggregate the output of the model by applying the selection layer to the output. Batch version.
+
+        The selection layer is used to compute weights for each output pixel.
+        These weights are then applied to the output, and the mean of the output is taken across the N_neo and M_neo dimensions.
+
+        Returns:
+            np.ndarray: The aggregated output of the model.
+        """
+        output = self.state_batched[:, :, :, -self.num_classes :]  # Only the class channels, but keep the padded size
+
+        B = len(output)
+        N_neo, M_neo = self.size_neo
+
+        input_to_select = np.empty((B * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
+        collect_input_to_select_batched(input_to_select, output, self.perceptions_batched, self.position, N_neo, M_neo)
+
+        # Get the weight for each output pixel
+        select_weights_flat = self.selection_layer(input_to_select)
+        select_weights = np.reshape(select_weights_flat, (B, N_neo, M_neo, 1))
+
+        # Apply the weight to the output
+        output = output[:, 1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
+
+        # Take the mean across N_neo and M_neo, but keep those dimensions
+        output = np.mean(output, axis=(1, 2), keepdims=True)  # Remember to change lambda if this is changed
+
+        return output
 
     def classify(self, img_raw, visualize=False, step=None, correct_label_index=None):  # , silencing_indexes=None):
         """
@@ -338,26 +354,44 @@ class ActiveNCA:
             self.actions = None
             self.perceptions_through_time = None
 
-        output = self.state[:, :, -self.num_classes :]
+        # Apply selection
         if self.selection and (step is None or step == self.iterations - 1):
-            input_to_select = np.empty((1 * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
-            collect_input_to_select_batched(
-                input_to_select, output[None], self.perceptions[None], self.position, N_neo, M_neo
-            )
-
-            # Get the weight for each output pixel
-            select_weights_flat = self.selection_layer(input_to_select)
-            select_weights = np.reshape(select_weights_flat, (N_neo, M_neo, 1))
-
-            # Apply the weight to the output
-            output = output[1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
-
-            # Take the mean across N_neo and M_neo, but keep those dimensions
-            output = np.mean(output, axis=(0, 1), keepdims=True)  # Remember to change lambda if this is changed
+            output = self.aggregate()
 
             return output, guesses
 
-        return output[1 : 1 + N_neo, 1 : 1 + M_neo, :], guesses
+        return self.state[1 : 1 + N_neo, 1 : 1 + M_neo, -self.num_classes :], guesses
+
+    def aggregate(self):
+        """
+        Aggregate the output of the model by applying the selection layer to the output.
+
+        The selection layer is used to compute weights for each output pixel.
+        These weights are then applied to the output, and the mean of the output is taken across the N_neo and M_neo dimensions.
+
+        Returns:
+            np.ndarray: The aggregated output of the model.
+        """
+        output = self.state[:, :, -self.num_classes :]
+
+        N_neo, M_neo = self.size_neo
+
+        input_to_select = np.empty((1 * N_neo * M_neo, 3 * 3 * self.num_classes + self.position_addon))
+        collect_input_to_select_batched(
+            input_to_select, output[None], self.perceptions[None], self.position, N_neo, M_neo
+        )
+
+        # Get the weight for each output pixel
+        select_weights_flat = self.selection_layer(input_to_select)
+        select_weights = np.reshape(select_weights_flat, (N_neo, M_neo, 1))
+
+        # Apply the weight to the output
+        output = output[1 : 1 + N_neo, 1 : 1 + M_neo] * select_weights
+
+        # Take the mean across N_neo and M_neo, but keep those dimensions
+        output = np.mean(output, axis=(0, 1), keepdims=True)  # Remember to change lambda if this is changed
+
+        return output
 
     def visualize(
         self,
